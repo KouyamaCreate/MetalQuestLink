@@ -201,5 +201,4 @@
 
 ### Phase 7 残り
 
-- collaborator環境でrepository外tarballのUnity / Simulator E2Eを実行する。
 - Quest未接続のため配布APKの実機無装着E2Eは、接続後の実行手順を残す。

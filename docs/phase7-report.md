@@ -37,7 +37,8 @@ package load時にabsolute native pathを持つimplicit OpenXR layer manifestを
 - native layer: Mach-O arm64、ad-hoc署名検証成功
 - APK: `com.maquestlink.questclient`、version `0.1.0`
 - repository外packageのdoctor: error 0
-- tarball経由のrepository外Unity EditMode / Simulator PlayMode: collaborator最終実行待ち
+- tarball経由のrepository外Unity EditMode / Simulator PlayMode: 成功
+- 配布packageのlayer load / 接続待ち / doctor: 成功（error 0、Quest未接続warningのみ）
 - Quest実機E2E: Quest未接続のため未実施
 
 ## CI

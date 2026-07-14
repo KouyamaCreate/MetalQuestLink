@@ -11,7 +11,7 @@
 | 4 — Questクライアント | 完了 | EditMode 4/4成功、Unity 6000.3.6f1でarm64 APK build成功 |
 | 5 — Unityエディタ統合 | 完了 | EditMode 1/1、Meta XR Simulator PlayMode 1/1、layer load・接続待ち確認 |
 | 6 — 再投影・計測・ドキュメント | 完了 | world pose / clock unit 3/3、clock sync E2E、Phase 0〜5回帰成功 |
-| 7 — 配布パッケージング | 検証中 | 配布4点・checksum・repository外展開・doctor成功、clean Unity E2E待ち |
+| 7 — 配布パッケージング | 完了 | 配布4点・checksum・repository外tarball Unity/Simulator E2E・doctor成功 |
 | 8 — Quest機能の拡張対応 | 未着手 | — |
 
 ## Phase 0
@@ -173,6 +173,7 @@
   - `doctor.sh --register`はerror 0。arm64、ad-hoc署名、package/APK version 0.1.0、manifest登録、Simulator、adbを確認した。Quest未接続とSimulator停止は警告。
 - clean Unity / Simulator E2E:
   - `scripts/test_phase7_clean.sh`を用意。tarballのみを参照する一時sampleでEditMode / PlayModeを実行する。
-  - 現在はcollaborator環境で最終実行待ち。
+  - repository外の一時Unity projectでEditMode / Meta XR Simulator PlayModeが成功。
+  - 配布packageのlayer load、`waiting_for_connection`、doctor error 0を確認した。
 - Quest device E2E:
   - Quest未接続。配布APKをinstall後に`scripts/e2e_device.sh`を実行し、無装着stream / input / world-fixed / clock syncを検証する。

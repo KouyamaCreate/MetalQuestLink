@@ -178,4 +178,5 @@
 - `scripts/test_phase7.sh`はUPM tarball、standalone APK、VERSIONのSHA-256を生成直後と展開前に検証して成功した。
 - repository外packageを対象に`doctor.sh --register`を実行し、error 0。Apple Silicon、macOS 26.4.1、layer architecture / signature、package/APK version、manifest、Meta XR Simulator、adbを確認した。
 - Simulator停止とQuest未接続は利用準備を妨げないため警告。Quest接続時は端末上の`com.maquestlink.questclient` versionもpackage versionと比較する。
-- `scripts/test_phase7_clean.sh`はtarballだけを参照する一時Unity sampleを作る。Editor/Simulator実行はcollaboratorによる最終確認待ち。
+- `scripts/test_phase7_clean.sh`はtarballだけを参照するrepository外の一時Unity sampleを作り、EditMode / Meta XR Simulator PlayMode、layer load、接続待ち、doctor error 0を確認して成功した。
+- 初回実行では過去の並行batchmode実行が残したorphanのUnity Licensing ClientによりIPC再接続が停止した。stale processだけを終了し、license cacheは変更せず再実行して成功した。
