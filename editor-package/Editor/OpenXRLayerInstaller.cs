@@ -32,7 +32,7 @@ namespace MaQuestLink.Editor
             if (string.IsNullOrEmpty(libraryPath))
             {
                 throw new FileNotFoundException(
-                    "MaQuestLink native layer was not found. Build the repository with CMake first.");
+                    "MaQuestLink native layer is missing from this package. Reinstall the release package.");
             }
 
             var manifestDirectory = Environment.GetEnvironmentVariable("MAQUESTLINK_MANIFEST_DIR");
@@ -73,7 +73,6 @@ namespace MaQuestLink.Editor
             var candidates = new[]
             {
                 Path.Combine(package.resolvedPath, "Native~", "macOS", "libmaquestlink_openxr_layer.so"),
-                Path.Combine(package.resolvedPath, "..", "build", "layer", "libmaquestlink_openxr_layer.so"),
             };
             foreach (var candidate in candidates)
             {
@@ -101,7 +100,6 @@ namespace MaQuestLink.Editor
             var candidates = new[]
             {
                 Path.Combine(package.resolvedPath, "QuestClient~", "MaQuestLink.apk"),
-                Path.Combine(package.resolvedPath, "..", "quest-client", "Builds", "MaQuestLink.apk"),
             };
             foreach (var candidate in candidates)
             {

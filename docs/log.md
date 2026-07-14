@@ -180,3 +180,26 @@
 
 - Quest実機未接続のため、world-fixed表示の目視、MediaCodec Surface、capture-to-receive / decode実値は未確認。
 - Phase 7でnative layer / APKをUPM packageへ同梱し、repository build不要の配布物を作る。
+
+### Phase 7 変更
+
+- UPM packageへarm64 native layer、layer manifest、Quest APK、VERSIONを同梱し、repository build fallbackを削除した。
+- 1 command release builder、checksum付き配布物smoke test、repository外Unity E2E、doctorを追加した。
+- GitHub ActionsへmacOS arm64 native regressionとUnity license前提の手動Quest APK buildを追加した。
+- READMEへ他のMac利用者向けtarball / git URL導入、Gatekeeper、公証、release、CI secret手順を追加した。
+
+### Phase 7 理由
+
+- CMake / Xcode / Homebrewを持たない利用者がpackage導入、APK install、Playだけで利用できる配布境界を作るため。
+
+### Phase 7 影響
+
+- `editor-package/Native~/`、`editor-package/QuestClient~/`、`editor-package/VERSION`
+- `scripts/build_release.sh`、`doctor.sh`、`test_phase7.sh`、`test_phase7_clean.sh`
+- `.github/workflows/`
+- `README.md`、`docs/`、`session.md`
+
+### Phase 7 残り
+
+- collaborator環境でrepository外tarballのUnity / Simulator E2Eを実行する。
+- Quest未接続のため配布APKの実機無装着E2Eは、接続後の実行手順を残す。

@@ -1,11 +1,11 @@
 # MaQuestLink Editor
 
-This local UPM package registers the MaQuestLink OpenXR layer and provides Quest APK/ADB controls.
+Unity Editor Play ModeをQuest 3 / 3SへstreamするMaQuestLinkの自己完結UPM packageです。
+ビルド済みApple Silicon OpenXR API layerとQuest APKを含みます。
 
-1. Add `com.maquestlink.editor` from this directory in Unity Package Manager.
-2. Open **Window > MaQuestLink** and click **Install Quest APK** once.
-3. Press Play with Meta XR Simulator selected.
+導入後は `Window > MaQuestLink` を開き、`Install Quest APK` を押してからPlayします。
+package load時にimplicit OpenXR layer manifestを自動登録します。利用者側でCMakeやXcodeを
+実行する必要はありません。
 
-The package sets up `adb reverse`, launches the installed Quest client, and shows connection, FPS,
-and native copy/encode latency. During repository development, build the native layer and Quest APK
-before opening the sample. Packaged binaries are added in Phase 7.
+対応環境、Meta XR Simulatorの導入、Gatekeeper、診断方法はrepository直下の
+`README.md`を参照してください。

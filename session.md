@@ -2,6 +2,6 @@
 
 最終更新: 2026-07-15
 
-- 現在: Phase 5完了。Editor package EditMode 1/1、Meta XR Simulator PlayMode 1/1、layer loadとQuest接続待ちstatusを確認。実機E2EはQuest未接続
-- 次: Phase 6のworld-fixed再投影、motion-to-photon計測、仕上げdocs
+- 現在: Phase 7検証中。自己完結UPM、release 4点、checksum、doctor、CIを実装し、repository外展開smokeは成功
+- 次: `scripts/test_phase7_clean.sh`のUnity/Simulator E2E後にPhase 7を確定し、Phase 8へ進む
 - 基準: `docs/plan.md` のPhase順と受け入れ基準に従う

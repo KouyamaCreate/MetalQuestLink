@@ -75,6 +75,15 @@
 - Mac layer statusはschema `version: 1`とconnection、copy、encode、合計pipeline msを安定した`Library/MaQuestLink/status.json`へ出す。Quest側decode値はSurface releaseまでであり、光学的motion-to-photonではない。
 - `scripts/e2e_device.sh` は既存fps / pose Hzに加え、world-fixed、clock sync、capture-to-decode値を判定する。
 
+### 配布package
+
+- `editor-package/`はgit URLまたはlocal tarballで導入できる自己完結UPM package。`Native~/macOS/`にarm64 OpenXR layerとmanifest、`QuestClient~/`にIL2CPP / ARM64 APKを含む。installerはrepositoryの`build/`や`quest-client/Builds/`へfallbackしない。
+- package versionの正本は`package.json`。`VERSION`とQuest APK `bundleVersion`を同じsemverに保つ。HEADにtagがあるrelease buildでは`v<semver>`との一致を必須とする。
+- `scripts/build_release.sh`はnative Release build / ctest、Quest APK build、dylib ad-hoc署名を行い、`dist/`へUPM tarball、APK、`SHA256SUMS`、`VERSION`を生成する。
+- `scripts/doctor.sh`はApple Silicon / macOS、package binaryと署名、package/APK version、implicit manifest、Meta XR Simulator、adb、接続deviceとinstall済みAPK versionを検査する。Quest未接続とSimulator停止は警告として通常診断を継続する。
+- `scripts/test_phase7.sh`はrepository外へtarballを展開して自己完結性とchecksumを検証する。`scripts/test_phase7_clean.sh`はtarballだけを参照する一時Unity sampleでEditMode / Simulator PlayMode E2Eを行う。
+- native CIはGitHub-hosted `macos-15` arm64 runnerを使う。Quest APK CIはUnity license secretsを必要とする手動workflow。
+
 ## 未実装
 
-- 配布パッケージ、Phase 8のQuest拡張機能
+- Phase 8のQuest拡張機能

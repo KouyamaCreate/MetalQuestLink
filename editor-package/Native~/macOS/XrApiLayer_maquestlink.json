@@ -1,0 +1,12 @@
+{
+  "file_format_version": "1.0.0",
+  "api_layer": {
+    "name": "XR_APILAYER_MAQUESTLINK_streaming",
+    "library_path": "libmaquestlink_openxr_layer.so",
+    "api_version": "1.0",
+    "implementation_version": "1",
+    "description": "MaQuestLink OpenXR streaming layer",
+    "enable_environment": "MAQUESTLINK_ENABLE_API_LAYER",
+    "disable_environment": "MAQUESTLINK_DISABLE_API_LAYER"
+  }
+}

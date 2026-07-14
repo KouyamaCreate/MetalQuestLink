@@ -1,0 +1,24 @@
+name: Native layer
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release -j 3
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Verify Apple Silicon layer
+        run: |
+          file build/layer/libmaquestlink_openxr_layer.so | grep -E 'Mach-O .* arm64'
+          codesign --verify --strict build/layer/libmaquestlink_openxr_layer.so

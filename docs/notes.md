@@ -163,3 +163,19 @@
 - Quest EditMode 7/7、IL2CPP / ARM64 APK build成功。
 - Phase 0〜5のMac/Simulator/Unity検証を最終状態で再実行し成功。device E2EだけはQuest未接続のためexit 2。
 - `scripts/test_quest_client.sh` / `build_quest_client.sh` / `test_phase5.sh` は公式Meta XR Core 203.0.0 tarballのローカル展開がある場合だけ一時利用し、終了時に公開registry manifest / lockへ戻す。
+
+## 2026-07-15 — Phase 7 配布検証
+
+### 自己完結package
+
+- `OpenXRLayerInstaller`の探索先をpackage内`Native~/macOS`と`QuestClient~`だけに限定した。repository内buildへのfallbackはない。
+- 同梱layerはMach-O bundle arm64、760 KiB。`codesign --verify --strict`でad-hoc署名を確認した。
+- 同梱APKは42 MiB。Unity SDKの`aapt`でpackage `com.maquestlink.questclient`、version `0.1.0`を確認した。
+- UPM tarballは約37 MiB。repository外へ展開したpackageにnative layer、manifest、APKがあり、source textにrepository build path依存がないことを確認した。
+
+### release / doctor
+
+- `scripts/test_phase7.sh`はUPM tarball、standalone APK、VERSIONのSHA-256を生成直後と展開前に検証して成功した。
+- repository外packageを対象に`doctor.sh --register`を実行し、error 0。Apple Silicon、macOS 26.4.1、layer architecture / signature、package/APK version、manifest、Meta XR Simulator、adbを確認した。
+- Simulator停止とQuest未接続は利用準備を妨げないため警告。Quest接続時は端末上の`com.maquestlink.questclient` versionもpackage versionと比較する。
+- `scripts/test_phase7_clean.sh`はtarballだけを参照する一時Unity sampleを作る。Editor/Simulator実行はcollaboratorによる最終確認待ち。

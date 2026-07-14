@@ -10,8 +10,8 @@
 | 3 — 入力パイプライン | 完了 | view/space/action合成入力E2E成功、PoseInput 138 samples |
 | 4 — Questクライアント | 完了 | EditMode 4/4成功、Unity 6000.3.6f1でarm64 APK build成功 |
 | 5 — Unityエディタ統合 | 完了 | EditMode 1/1、Meta XR Simulator PlayMode 1/1、layer load・接続待ち確認 |
-| 7 — 配布パッケージング | 未着手 | — |
 | 6 — 再投影・計測・ドキュメント | 完了 | world pose / clock unit 3/3、clock sync E2E、Phase 0〜5回帰成功 |
+| 7 — 配布パッケージング | 検証中 | 配布4点・checksum・repository外展開・doctor成功、clean Unity E2E待ち |
 | 8 — Quest機能の拡張対応 | 未着手 | — |
 
 ## Phase 0
@@ -157,3 +157,22 @@
 - Quest device E2E:
   - `scripts/e2e_device.sh` は実機未接続を検出しexit 2。実機値は未実測。
 - 詳細な実測結果: `docs/notes.md` の「Phase 6」を参照。
+
+## Phase 7
+
+- 成果物:
+  - arm64 ad-hoc signed layer、manifest、Quest APKを同梱する自己完結`com.maquestlink.editor`
+  - UPM tarball / APK / `SHA256SUMS` / `VERSION`を作る`scripts/build_release.sh`
+  - package・登録・Simulator・adb・端末APKを日本語診断する`scripts/doctor.sh`
+  - repository外展開smoke testとtarball経由clean Unity/Simulator E2E
+  - macOS arm64 native CIとUnity license付き手動Quest APK CI
+- release smoke:
+  - `scripts/test_phase7.sh`: 成功。
+  - `dist/`の4種類を生成し、`shasum -a 256 -c SHA256SUMS`が全3対象で成功。
+  - tarballを`/private/tmp`系のrepository外directoryへ展開し、native layer / manifest / APKが存在することを確認。
+  - `doctor.sh --register`はerror 0。arm64、ad-hoc署名、package/APK version 0.1.0、manifest登録、Simulator、adbを確認した。Quest未接続とSimulator停止は警告。
+- clean Unity / Simulator E2E:
+  - `scripts/test_phase7_clean.sh`を用意。tarballのみを参照する一時sampleでEditMode / PlayModeを実行する。
+  - 現在はcollaborator環境で最終実行待ち。
+- Quest device E2E:
+  - Quest未接続。配布APKをinstall後に`scripts/e2e_device.sh`を実行し、無装着stream / input / world-fixed / clock syncを検証する。
