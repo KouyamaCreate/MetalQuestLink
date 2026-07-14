@@ -2,6 +2,6 @@
 
 最終更新: 2026-07-15
 
-- 現在: Phase 3完了。合成PoseInput 138 samples、view/space/action注入、映像120/120・76.4866 fpsを同時E2E確認済み
-- 次: Phase 4のUnity 6 Quest client、MediaCodec/OVROverlay、60 Hz入力送信、診断mode、APK build
+- 現在: Phase 4完了。Unity EditMode 4/4、Unity 6000.3.6f1 IL2CPP/ARM64 APK build、aapt検査まで成功。実機E2EはQuest未接続のためスクリプト完成・未接続判定まで確認
+- 次: Phase 5の`com.maquestlink.editor`、Editor window、adb操作、Play開始連携、最小sample scene
 - 基準: `docs/plan.md` のPhase順と受け入れ基準に従う

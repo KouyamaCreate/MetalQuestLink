@@ -91,3 +91,32 @@
 - protocol v1はclick 4種に加えcapacitive touch 4種のbitを確保した。mock E2Eではclick/analogを検証し、Questからのtouch取得はPhase 4で実装する。
 - controller pose protocolは左右1 poseずつのため、grip poseとaim poseへ同じ値を返す。別poseが必要になった場合はprotocol拡張が必要。
 - `xrLocateViews` のeye offsetは現時点で固定IPD 64 mm。実機HMDから左右eye transformを送らないMVP仕様であり、Phase 6の再投影検証時に必要なら調整する。
+
+## 2026-07-15 — Phase 4 実測
+
+### Unity / Meta XR構成
+
+- Unityは指定どおり6000.3.6f1、Android Build Support同梱のSDK 36 / NDK / OpenJDKを使用した。
+- Meta公式npm registryのMeta XR Core SDK 203.0.0を採用した。package tarball SHA-1は `3196ba8fc3d47351251e3b6c021371bf77ccaf17`。
+- registryからの183 MiB取得が極端に低速だったため、検証runは同じ公式tarballをSHA-1確認後にローカル展開して実行した。commitする`manifest.json` / `packages-lock.json`は公開registryのversion `203.0.0`指定へ戻しており、一時pathへの依存はない。
+- Unity Meta OpenXR 2.5.1、OpenXR Plugin 1.15.1を使用した。Android OpenXR loader、Meta Quest Support、Oculus Touch / Meta Quest Touch Plus profile、Composition Layers Supportをbatch build時に有効化する。
+- APKはQuest 3 (`eureka`) / Quest 3S (`quest3s`) のみを対象とする。Meta Quest featureの既定値のままQuest Proも対象にするとeye-tracking必須feature/permissionがmanifestへ入るため、明示的に除外した。
+
+### OVROverlay External Surface
+
+- Core SDK 203.0.0の `OVROverlay` は `isExternalSurface`、pixel width/height、JNI Surface jobjectを示す `IntPtr externalSurfaceObject` を公開する。
+- compositorが作ったjobjectをUnityの `AndroidJavaObject(IntPtr)` で保持し、MediaCodecのoutput Surfaceとしてconfigureする。Unity textureへのcopyは行わない。
+- side-by-sideは `srcRectLeft=(0,0,0.5,1)`、`srcRectRight=(0.5,0,0.5,1)` と `overrideTextureRectMatrix=true` で指定する。
+- MVP表示はCenterEye cameraの子に置く3.2 m幅、2 m先のhead-fixed Quad。Phase 6でrender poseを使うworld-fixed reprojectionを既定化する。
+
+### デコードと診断
+
+- MediaCodecはH.264 `video/avc` またはHEVC `video/hevc`、`low-latency=1`、priority 0を要求する。端末がlow-latency keyを拒否した場合は同じSurfaceへ通常modeで再configureする。
+- `MAQUESTLINK_DIAGNOSTIC` にconnected、累積received/decoded/poses、1秒区間のreceive/decode fps・pose Hz、drop数、low-latency要求結果をJSON出力する。
+- Android extrasは `maquestlink_diagnostic`、`maquestlink_host`、`maquestlink_wifi_host`、`maquestlink_port`。
+
+### 検証結果と未実測
+
+- Unity EditMode testは4/4成功。C++ protocolと同じ20-byte header、152-byte PoseInput、120-byte固定部+映像dataのVideoFrameを確認した。
+- APKはUnity batch modeで生成成功。42 MiB、IL2CPP / arm64-v8a、minSdk 32、targetSdk 36、GameActivityをaaptで確認した。
+- Quest実機は未接続。このためMediaCodecの`low-latency`実受理、OVROverlayへの実表示、無装着時のpower-manager broadcast結果、実測30 fps / 60 Hzは未確認。`scripts/e2e_device.sh` は接続後にinstall、adb reverse、power automation、診断判定、後片付けまで自動実行する。

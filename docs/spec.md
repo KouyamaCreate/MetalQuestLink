@@ -44,6 +44,18 @@
 - `maquestlink_mock_viewer --send-input` は既知の合成HMD/controller pose、button、thumbstick、trigger、gripを約90 Hzで送る。
 - `scripts/test_phase3.sh` は映像decodeと同時に、合成値がview、action space、boolean/float/vector action stateへ反映されることを検証する。
 
+### Questクライアント
+
+- `quest-client/` はUnity 6000.3.6f1、Meta XR Core SDK 203.0.0、Unity Meta OpenXR 2.5.1を使うAndroid OpenXR project。
+- MediaCodecへAnnex B access unitを投入し、Meta `OVROverlay` のcompositor-managed External Surfaceへ直接出力する。SBS映像の左右halfを各eyeへ割り当てる。
+- MediaCodecはlow-latency modeを先に試し、未対応端末では通常modeへfallbackする。H.264とHEVCのprotocol codecに対応する。
+- MVP画面はhead-fixedの3.2 m幅Quad。`OVRCameraRig` / `OVRManager`を持つgenerated sceneをCLI build時に生成する。
+- HMDと左右controllerをUnity XR inputから毎Update取得し、OpenXR座標へ変換して最新PoseInputを送る。72 fpsを要求し、transportはbacklogを作らず最新sampleだけを送信する。
+- 接続候補は`127.0.0.1`（`adb reverse tcp:42424 tcp:42424`）を先に試し、指定されたWi-Fi hostへfallbackする。切断後は500 ms間隔で自動再接続する。
+- `adb shell am start` extrasでdiagnostic、host、Wi-Fi fallback、portを上書きできる。diagnostic modeは毎秒 `MAQUESTLINK_DIAGNOSTIC` JSONをlogcatへ出す。
+- `scripts/test_quest_client.sh` はXR非依存のprotocol/transportをEditModeで検証し、`scripts/build_quest_client.sh` はIL2CPP/ARM64 APKを生成する。
+- `scripts/e2e_device.sh` はinstall、adb reverse、無装着power automation、起動、Mac producer、logcat判定を自動化し、receive/decode 30 fps以上とPose送信60 Hz以上を要求する。
+
 ## 未実装
 
-- Questクライアント、Unityエディタ統合、配布パッケージ
+- world-fixed再投影、Unityエディタ統合、配布パッケージ、Phase 8のQuest拡張機能

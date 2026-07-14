@@ -1,0 +1,14 @@
+{
+  "name": "MaQuestLink.QuestClient",
+  "rootNamespace": "MaQuestLink.QuestClient",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

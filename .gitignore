@@ -1,3 +1,11 @@
 /build/
 /.codex/
-/.DS_Store
+/dist/
+/quest-client/Builds/
+/quest-client/.utmp/
+/quest-client/Library/
+/quest-client/Logs/
+/quest-client/Temp/
+/quest-client/UserSettings/
+/quest-client/TestResults.xml
+*.DS_Store

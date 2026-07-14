@@ -98,3 +98,26 @@
 
 - Phase 4でQuest native/Unity側から実際のHMD/controller入力を60 Hz以上で送る。
 - OVRPlugin要求拡張一覧とUnity action bindingはPhase 5のEditor Play modeで実測する。
+
+### Phase 4 変更
+
+- Unity 6000.3.6f1 + Meta XR Core SDK 203.0.0のQuest client projectを追加した。
+- MediaCodec low-latency decoderとOVROverlay External SurfaceのSBS表示を追加した。
+- HMD / Touch Plus pose・button・touch・analog入力の72 Hz送信とlocalhost / Wi-Fi再接続transportを追加した。
+- adb extras診断mode、Unity EditMode test、CLI APK build、無装着device E2Eを追加した。
+
+### Phase 4 理由
+
+- Mac側で実証済みの映像・入力経路をQuest実機アプリへ接続し、装着なしで性能を判定できる受信側を用意するため。
+
+### Phase 4 影響
+
+- `quest-client/`
+- `scripts/build_quest_client.sh`、`scripts/test_quest_client.sh`、`scripts/e2e_device.sh`
+- `.gitignore`
+- `README.md`、`docs/`、`session.md`
+
+### Phase 4 残り
+
+- Quest未接続のため、実機MediaCodec / External Surface / input rate / power automationは `scripts/e2e_device.sh` で後日実測する。
+- Phase 5でEditor packageとsampleを追加し、Unity Editor Play modeからのend-to-end起動を実証する。

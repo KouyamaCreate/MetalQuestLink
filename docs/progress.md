@@ -8,10 +8,11 @@
 | 1 — 技術検証スパイク | 完了 | clean build成功、Simulator Metal E2E 120 frames成功、layer load確認 |
 | 2 — 映像パイプライン | 完了 | H.264 decode 120/120・66.8345 fps、未接続60 frames完走 |
 | 3 — 入力パイプライン | 完了 | view/space/action合成入力E2E成功、PoseInput 138 samples |
-| 4 — Questクライアント | 未着手 | — |
+| 4 — Questクライアント | 完了 | EditMode 4/4成功、Unity 6000.3.6f1でarm64 APK build成功 |
 | 5 — Unityエディタ統合 | 未着手 | — |
 | 6 — 再投影・計測・ドキュメント | 未着手 | — |
 | 7 — 配布パッケージング | 未着手 | — |
+| 8 — Quest機能の拡張対応 | 未着手 | — |
 
 ## Phase 0
 
@@ -84,3 +85,26 @@
 - Phase 2 regression: `scripts/test_phase2.sh`
   - 結果: 成功。未接続pass-throughと接続映像decodeの両方を再確認。
 - 詳細な実測結果: `docs/notes.md` の「Phase 3」を参照。
+
+## Phase 4
+
+- 成果物:
+  - Unity 6000.3.6f1 / Meta XR Core SDK 203.0.0 / Unity Meta OpenXR 2.5.1のQuest client
+  - H.264/HEVC Annex Bを受けるMediaCodec Surface decoderとOVROverlay External Surface SBS表示
+  - Quest HMD / Touch Plus pose・button・touch・thumbstick・trigger・gripの72 Hz送信
+  - localhost（`adb reverse`）優先、Wi-Fi hostフォールバック付き全二重TCP transport
+  - adb extrasで有効化する毎秒JSON診断ログと無装着E2E `scripts/e2e_device.sh`
+  - Unity batch test/buildスクリプト
+- protocol / transport test:
+  - `scripts/test_quest_client.sh`
+  - 結果: 成功。EditMode 4/4 passed。VideoFrame / PoseInput / Controlのwire round-trip、invalid frame拒否、映像受信とPoseInput送信の全二重loopbackを確認。
+- APK build:
+  - `scripts/build_quest_client.sh`
+  - 結果: 成功。Unity 6000.3.6f1のbatch mode、IL2CPP、ARM64。APK 42 MiB。
+  - `aapt dump badging` でpackage `com.maquestlink.questclient`、version `0.1.0`、minSdk 32、targetSdk 36、`UnityPlayerGameActivity`、`arm64-v8a`、Quest headtracking featureを確認。
+  - Quest 3 / 3Sのみを対象とし、Quest Pro専用eye-tracking feature/permissionが入らないことを確認。
+- device E2E:
+  - `scripts/e2e_device.sh`
+  - 現在はQuest 3未接続のため、未接続を検出して手順付きでexit 2することを確認。
+  - 実機を接続して `scripts/e2e_device.sh` を実行する。
+- 詳細な実測結果: `docs/notes.md` の「Phase 4」を参照。
