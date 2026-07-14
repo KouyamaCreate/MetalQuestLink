@@ -120,3 +120,20 @@
 - Unity EditMode testは4/4成功。C++ protocolと同じ20-byte header、152-byte PoseInput、120-byte固定部+映像dataのVideoFrameを確認した。
 - APKはUnity batch modeで生成成功。42 MiB、IL2CPP / arm64-v8a、minSdk 32、targetSdk 36、GameActivityをaaptで確認した。
 - Quest実機は未接続。このためMediaCodecの`low-latency`実受理、OVROverlayへの実表示、無装着時のpower-manager broadcast結果、実測30 fps / 60 Hzは未確認。`scripts/e2e_device.sh` は接続後にinstall、adb reverse、power automation、診断判定、後片付けまで自動実行する。
+
+## 2026-07-15 — Phase 5 実測
+
+### Unity Editor / Meta XR Simulator
+
+- Unity 6000.3.6f1 PlayModeからMeta XR Simulator 201.0.0へ接続し、OVRPluginの`CompositorOpenXR::Initialize()`成功とMetal `XrSession`作成を確認した。
+- layer logはapplication名 `Oculus VR Plugin (Unity 6000.3.6f1 [Editor])` と `Unity Application` のinstance load / destroyを記録した。
+- Unity OpenXR diagnostic reportにも `XR_APILAYER_MAQUESTLINK_streaming` が列挙された。
+- Quest未接続時のstatus JSONは `connected=false`、encoded frames / fps / copy / encode / pipelineが0。PlayMode testはこの接続待ち状態を確認した。
+- PlayMode E2Eへ `-nographics` を付けるとNull graphics deviceとなり、`xrCreateSession` が `XR_ERROR_GRAPHICS_DEVICE_INVALID` を返す。Meta XR SimulatorのMetal sessionを検証するrunではgraphics deviceを有効にする必要がある。
+
+### package導入と検証
+
+- package load時にlayer manifestを自動登録し、Play開始直前にも再確認する。ADB deviceがない場合もlayer側はlistenを開始し、Playは継続する。
+- Meta XR Core SDK 203.0.0は公式tarballのローカル展開を検証時だけ使用した。`samples/MetaXRMinimal/Packages/manifest.json` は公開registryの`203.0.0`指定へ復元される。
+- `scripts/test_phase5.sh` 最終runはEditor package EditMode 1/1、sample PlayMode 1/1 passed。sample内で`OVRCameraRig`と`OVRGrabbable`の存在も確認した。
+- Quest実機は未接続のため、Editor windowがconnected状態へ遷移し、実fps/latencyを表示する経路は未実測。

@@ -1,0 +1,22 @@
+{
+  "scopedRegistries": [
+    {
+      "name": "Meta XR SDK",
+      "url": "https://npm.developer.oculus.com",
+      "scopes": ["com.meta.xr"]
+    }
+  ],
+  "dependencies": {
+    "com.maquestlink.editor": "file:../../../editor-package",
+    "com.meta.xr.sdk.core": "203.0.0",
+    "com.unity.test-framework": "1.6.0",
+    "com.unity.modules.androidjni": "1.0.0",
+    "com.unity.modules.animation": "1.0.0",
+    "com.unity.modules.assetbundle": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.physics2d": "1.0.0",
+    "com.unity.xr.meta-openxr": "2.5.1",
+    "com.unity.xr.openxr": "1.15.1"
+  },
+  "testables": ["com.maquestlink.editor"]
+}

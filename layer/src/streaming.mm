@@ -12,6 +12,9 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <map>
@@ -69,6 +72,58 @@ struct FrameMetadata {
 std::atomic<std::uint64_t> g_encoded_frames{};
 std::atomic<std::uint64_t> g_total_copy_ns{};
 std::atomic<std::uint64_t> g_total_encode_ns{};
+std::mutex g_status_mutex;
+std::uint64_t g_last_status_ns{};
+std::uint64_t g_last_status_frames{};
+
+void write_status(bool force = false) {
+  const char* status_path = std::getenv("MAQUESTLINK_STATUS_FILE");
+  if (status_path == nullptr || *status_path == '\0') {
+    return;
+  }
+
+  std::scoped_lock lock(g_status_mutex);
+  const std::uint64_t now = monotonic_now_ns();
+  if (!force && g_last_status_ns != 0 && now - g_last_status_ns < 1'000'000'000ULL) {
+    return;
+  }
+
+  const std::uint64_t frames = g_encoded_frames.load();
+  const double elapsed_seconds = g_last_status_ns == 0
+                                     ? 0.0
+                                     : static_cast<double>(now - g_last_status_ns) / 1'000'000'000.0;
+  const double fps = elapsed_seconds <= 0.0
+                         ? 0.0
+                         : static_cast<double>(frames - g_last_status_frames) / elapsed_seconds;
+  const double average_copy_ms = frames == 0
+                                     ? 0.0
+                                     : static_cast<double>(g_total_copy_ns.load()) / frames / 1'000'000.0;
+  const double average_encode_ms = frames == 0
+                                       ? 0.0
+                                       : static_cast<double>(g_total_encode_ns.load()) / frames / 1'000'000.0;
+
+  const std::string path(status_path);
+  const std::string temporary_path = path + ".tmp";
+  std::ofstream output(temporary_path, std::ios::trunc);
+  if (!output) {
+    return;
+  }
+  output << "{\n"
+         << "  \"connected\": " << (transport_connected() ? "true" : "false") << ",\n"
+         << "  \"encodedFrames\": " << frames << ",\n"
+         << "  \"fps\": " << fps << ",\n"
+         << "  \"averageCopyMs\": " << average_copy_ms << ",\n"
+         << "  \"averageEncodeMs\": " << average_encode_ms << ",\n"
+         << "  \"averagePipelineMs\": " << average_copy_ms + average_encode_ms << "\n"
+         << "}\n";
+  output.close();
+  if (output && std::rename(temporary_path.c_str(), path.c_str()) == 0) {
+    g_last_status_ns = now;
+    g_last_status_frames = frames;
+  } else {
+    (void)std::remove(temporary_path.c_str());
+  }
+}
 
 [[nodiscard]] std::vector<std::byte> annex_b_data(CMSampleBufferRef sample, bool keyframe) {
   std::vector<std::byte> result;
@@ -468,6 +523,7 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_end_frame(XrSession session, const XrFrameEn
       break;
     }
   }
+  write_status();
   const auto next = next_function<PFN_xrEndFrame>(instance, "xrEndFrame");
   return next == nullptr ? XR_ERROR_HANDLE_INVALID : next(session, info);
 }
@@ -480,6 +536,7 @@ void streaming_register_instance(XrInstance instance, PFN_xrGetInstanceProcAddr 
     g_instances[instance] = InstanceData{gipa};
   }
   transport_start();
+  write_status(true);
 }
 
 void streaming_unregister_instance(XrInstance instance) {
@@ -504,6 +561,7 @@ void streaming_unregister_instance(XrInstance instance) {
     g_instances.erase(instance);
   }
   transport_stop();
+  write_status(true);
 }
 
 bool streaming_get_proc_addr(const char* name, PFN_xrVoidFunction* function) {

@@ -56,6 +56,15 @@
 - `scripts/test_quest_client.sh` はXR非依存のprotocol/transportをEditModeで検証し、`scripts/build_quest_client.sh` はIL2CPP/ARM64 APKを生成する。
 - `scripts/e2e_device.sh` はinstall、adb reverse、無装着power automation、起動、Mac producer、logcat判定を自動化し、receive/decode 30 fps以上とPose送信60 Hz以上を要求する。
 
+### Unityエディタ統合
+
+- `editor-package/` はlocal UPM package `com.maquestlink.editor`。Unity起動時とPlay開始直前にlayer manifestを `$HOME/.local/share/openxr/1/api_layers/implicit.d` へ登録する。
+- Play開始直前に `MAQUESTLINK_ENABLE_API_LAYER`、port、layer log、status JSONの環境変数を設定する。ADB deviceがあれば `adb reverse` を設定し、既定ではQuest clientも起動する。
+- `Window > MaQuestLink` はQuest接続状態、fps、平均Metal copy / VideoToolbox encode合計時間、encoded frame数を表示する。layer登録、APK install、adb reverse、client起動を手動でも実行できる。
+- native layerは `MAQUESTLINK_STATUS_FILE` 指定時、connection、encoded frames、fps、平均copy / encode / pipeline msを1秒周期でatomic JSON更新する。
+- `samples/MetaXRMinimal/` はUnity 6000.3 project。Meta XR Core SDK 203.0.0の`OVRCameraRig`、左右Touch controllerの`OVRGrabber`、`OVRGrabbable` cubeを生成する。
+- `scripts/test_phase5.sh` はsample生成、package manifest EditMode test、Meta XR Simulator上のPlayMode testを実行し、Unity applicationへのlayer loadと未接続待ち状態を検証する。PlayMode runはMetal graphics deviceが必要なため`-nographics`を使わない。
+
 ## 未実装
 
-- world-fixed再投影、Unityエディタ統合、配布パッケージ、Phase 8のQuest拡張機能
+- world-fixed再投影、配布パッケージ、Phase 8のQuest拡張機能

@@ -1,0 +1,6 @@
+{
+  "name": "MaQuestLink.Editor",
+  "rootNamespace": "MaQuestLink.Editor",
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

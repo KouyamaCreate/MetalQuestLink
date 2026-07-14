@@ -121,3 +121,28 @@
 
 - Quest未接続のため、実機MediaCodec / External Surface / input rate / power automationは `scripts/e2e_device.sh` で後日実測する。
 - Phase 5でEditor packageとsampleを追加し、Unity Editor Play modeからのend-to-end起動を実証する。
+
+### Phase 5 変更
+
+- local UPM package `com.maquestlink.editor` とconnection/性能表示Editor windowを追加した。
+- layer自動登録、Play開始前の環境設定、adb reverse、APK install/startをEditorへ統合した。
+- native layerへ接続状態、fps、copy/encode時間のJSON status出力を追加した。
+- Meta XR SDKの最小grabbable sceneとUnity EditMode / PlayMode E2Eを追加した。
+
+### Phase 5 理由
+
+- package導入、APK install、Playの3操作以内でMac EditorからQuest接続待ちまで到達させるため。
+
+### Phase 5 影響
+
+- `editor-package/`
+- `samples/MetaXRMinimal/`
+- `layer/src/streaming.mm`
+- `scripts/test_phase5.sh`
+- `.gitignore`
+- `README.md`、`docs/`、`session.md`
+
+### Phase 5 残り
+
+- Quest未接続のため、Editor windowのconnected/fps/latency実値表示は実機E2Eで確認する。
+- Phase 6でworld-fixed再投影とmotion-to-photon計測を実装する。

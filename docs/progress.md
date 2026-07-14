@@ -9,7 +9,7 @@
 | 2 — 映像パイプライン | 完了 | H.264 decode 120/120・66.8345 fps、未接続60 frames完走 |
 | 3 — 入力パイプライン | 完了 | view/space/action合成入力E2E成功、PoseInput 138 samples |
 | 4 — Questクライアント | 完了 | EditMode 4/4成功、Unity 6000.3.6f1でarm64 APK build成功 |
-| 5 — Unityエディタ統合 | 未着手 | — |
+| 5 — Unityエディタ統合 | 完了 | EditMode 1/1、Meta XR Simulator PlayMode 1/1、layer load・接続待ち確認 |
 | 6 — 再投影・計測・ドキュメント | 未着手 | — |
 | 7 — 配布パッケージング | 未着手 | — |
 | 8 — Quest機能の拡張対応 | 未着手 | — |
@@ -108,3 +108,26 @@
   - 現在はQuest 3未接続のため、未接続を検出して手順付きでexit 2することを確認。
   - 実機を接続して `scripts/e2e_device.sh` を実行する。
 - 詳細な実測結果: `docs/notes.md` の「Phase 4」を参照。
+
+## Phase 5
+
+- 成果物:
+  - local UPM package `com.maquestlink.editor`
+  - implicit OpenXR layer自動登録、Play開始前の環境設定、`adb reverse`とQuest client自動起動
+  - connection / fps / copy・encode latencyを表示する `Window > MaQuestLink`
+  - APK install、client起動、layer再登録の操作ボタン
+  - `OVRCameraRig`、左右`OVRGrabber`、`OVRGrabbable` cubeを持つ `samples/MetaXRMinimal`
+  - Unity EditMode / PlayModeを連続検証する `scripts/test_phase5.sh`
+- native build:
+  - `cmake --build build -j8`
+  - 結果: 成功。layerに1秒周期のatomic JSON status出力を追加した。
+- Editor / PlayMode E2E:
+  - `scripts/test_phase5.sh`
+  - 結果: EditMode 1/1、PlayMode 1/1 passed。
+  - Meta XR Simulator 201.0.0でMetal sessionを作成し、Unity 6000.3.6f1 Editorのlayer loadを確認した。
+  - Quest未接続状態で `connected=false` のstatus JSONと `status=waiting_for_connection` logを確認した。
+- 新規導入手順:
+  - Package Managerで `editor-package/` を導入する。
+  - `Window > MaQuestLink` で `Install Quest APK` を1回実行する。
+  - Meta XR Simulatorを選択してPlayする。layer登録、adb reverse、client起動は自動実行される。
+- 詳細な実測結果: `docs/notes.md` の「Phase 5」を参照。

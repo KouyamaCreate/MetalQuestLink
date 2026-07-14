@@ -8,4 +8,11 @@
 /quest-client/Temp/
 /quest-client/UserSettings/
 /quest-client/TestResults.xml
+/samples/MetaXRMinimal/Library/
+/samples/MetaXRMinimal/Logs/
+/samples/MetaXRMinimal/Temp/
+/samples/MetaXRMinimal/UserSettings/
+/samples/MetaXRMinimal/TestResults.xml
+/samples/MetaXRMinimal/Assets/InitTestScene*.unity*
+/samples/MetaXRMinimal/mono_crash.*.json
 *.DS_Store
