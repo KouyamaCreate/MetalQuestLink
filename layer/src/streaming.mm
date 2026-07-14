@@ -60,6 +60,7 @@ struct FrameMetadata {
   std::array<protocol::EyeView, 2> render_views{};
   std::uint32_t width{};
   std::uint32_t height{};
+  bool passthrough{};
 };
 
 [[nodiscard]] std::uint64_t monotonic_now_ns() {
@@ -208,7 +209,9 @@ void compression_callback(void*, void* source_ref, OSStatus status,
           .height = metadata->height,
           .codec = protocol::VideoCodec::H264,
           .eye_count = 2,
-          .flags = static_cast<std::uint16_t>(keyframe ? 1 : 0),
+          .flags = static_cast<std::uint16_t>(
+              (keyframe ? protocol::KeyFrame : 0U) |
+              (metadata->passthrough ? protocol::Passthrough : 0U)),
           .encoded_data = std::move(bytes),
       },
   });
@@ -228,7 +231,7 @@ class VideoEncoder {
 
   void encode(id<MTLCommandQueue> queue, id<MTLTexture> source, std::uint32_t width,
               std::uint32_t height, const XrCompositionLayerProjectionView* views,
-              std::uint64_t capture_timestamp_ns) {
+              std::uint64_t capture_timestamp_ns, bool passthrough) {
     std::scoped_lock lock(mutex_);
     if (!ensure(queue.device, width * 2, height)) {
       return;
@@ -289,6 +292,7 @@ class VideoEncoder {
     }
     metadata->width = width * 2;
     metadata->height = height;
+    metadata->passthrough = passthrough;
     VTEncodeInfoFlags flags{};
     const CMTime pts = CMTimeMake(static_cast<std::int64_t>(sequence), 90);
     if (VTCompressionSessionEncodeFrame(session_, pixel, pts, kCMTimeInvalid, nullptr,
@@ -517,9 +521,13 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_end_frame(XrSession session, const XrFrameEn
       id<MTLTexture> texture = (__bridge id<MTLTexture>)data.textures[data.last_acquired];
       if (texture.pixelFormat == MTLPixelFormatBGRA8Unorm ||
           texture.pixelFormat == MTLPixelFormatBGRA8Unorm_sRGB) {
+        const bool passthrough =
+            info->environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND ||
+            info->environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE ||
+            (projection->layerFlags & XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT) != 0;
         g_encoder.encode(queue, texture, static_cast<std::uint32_t>(left.imageRect.extent.width),
                          static_cast<std::uint32_t>(left.imageRect.extent.height),
-                         projection->views, capture_timestamp_ns);
+                         projection->views, capture_timestamp_ns, passthrough);
       }
       break;
     }

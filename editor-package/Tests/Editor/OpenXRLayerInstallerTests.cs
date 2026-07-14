@@ -34,6 +34,7 @@ namespace MaQuestLink.Editor.Tests
             StringAssert.Contains(OpenXRLayerInstaller.LayerName, json);
             StringAssert.Contains("libmaquestlink_openxr_layer.so", json);
             StringAssert.Contains("MAQUESTLINK_ENABLE_API_LAYER", json);
+            StringAssert.Contains("XR_EXT_hand_tracking", json);
         }
 
         [Test]

@@ -1,7 +1,10 @@
 {
   "name": "MaQuestLink.QuestClient",
   "rootNamespace": "MaQuestLink.QuestClient",
-  "references": [],
+  "references": [
+    "Unity.XR.Hands",
+    "Oculus.VR"
+  ],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

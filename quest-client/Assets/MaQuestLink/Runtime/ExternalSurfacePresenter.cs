@@ -15,11 +15,23 @@ namespace MaQuestLink.QuestClient
 
         private Component overlay;
         private Type overlayType;
+        private bool passthroughApproximation;
 
         public int SurfaceWidth => surfaceWidth;
         public int SurfaceHeight => surfaceHeight;
         public bool WorldFixed => worldFixed;
+        public bool PassthroughApproximation => passthroughApproximation;
 
+        public void SetPassthroughApproximation(bool enabled)
+        {
+            passthroughApproximation = enabled;
+            EnsureOverlay();
+            SetMember("overridePerLayerColorScaleAndOffset", enabled);
+            SetMember("colorScale", enabled
+                ? new Vector4(1.0f, 1.0f, 1.0f, Protocol.PassthroughApproximationAlpha)
+                : Vector4.one);
+            SetMember("colorOffset", Vector4.zero);
+        }
 
         public void ConfigureDimensions(int width, int height)
         {

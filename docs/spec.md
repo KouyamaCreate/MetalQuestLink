@@ -11,6 +11,8 @@
   - VideoFrame: host monotonic capture timestamp、左右眼それぞれのrender pose/FOV、画面寸法、codec、eye count、flags、エンコード済み映像
   - PoseInput: sample timestamp、HMD pose、左右コントローラpose、buttons、thumbstick、trigger、grip
   - Control: kind、flags、timestamp、拡張用データ
+  - HapticCommand: host timestamp、左右、apply/stop、振幅、周波数、持続時間
+  - HandTrackingInput: sample timestamp、左右active、各26関節のpose/radius/valid/tracked flags
 - codecはH.264とHEVC、control kindはhello/ack、stream開始/停止、ping/pong、disconnectを予約する。
 - controller buttonsはuint64 bit field。bit0〜3をPrimary、Secondary、Thumbstick、Menu click、bit4〜7をPrimary、Secondary、Thumbstick、Trigger capacitive touchに割り当てる。
 
@@ -43,6 +45,8 @@
 - `changedSinceLastSync` はsession/action/subactionごとに前回返却値と比較する。入力中断時はruntime stateへ戻る。
 - `maquestlink_mock_viewer --send-input` は既知の合成HMD/controller pose、button、thumbstick、trigger、gripを約90 Hzで送る。
 - `scripts/test_phase3.sh` は映像decodeと同時に、合成値がview、action space、boolean/float/vector action stateへ反映されることを検証する。native testの出力はpipeを介さずlog fileへ直接書き、子孫processがpipe writerを継承して終了を妨げる経路を作らない。
+- `xrApplyHapticFeedback` / `xrStopHapticFeedback`の成功結果を左右のHapticCommandへ変換する。振幅は0〜1へclampし、周波数と持続時間を保持する。
+- implicit layer manifestで`XR_EXT_hand_tracking`を列挙し、`xrGetSystemProperties`のsupport、hand tracker作成／破棄、左右26関節のlocateを提供する。受信手がinactiveまたはstaleならinactiveを返す。
 
 ### Questクライアント
 
@@ -51,6 +55,9 @@
 - MediaCodecはlow-latency modeを先に試し、未対応端末では通常modeへfallbackする。H.264とHEVCのprotocol codecに対応する。
 - MVP画面はhead-fixedの3.2 m幅Quad。`OVRCameraRig` / `OVRManager`を持つgenerated sceneをCLI build時に生成する。
 - HMDと左右controllerをUnity XR inputから毎Update取得し、OpenXR座標へ変換して最新PoseInputを送る。72 fpsを要求し、transportはbacklogを作らず最新sampleだけを送信する。
+- Unity XR HandsのHand Tracking SubsystemをAndroidで型指定して有効化する。同一feature IDを持つMicrosoft Hand Interaction Profileは使わない。追跡中の左右26関節をOpenXR順へ写し、PoseInputと同じ最新値優先transportで送る。
+- HapticCommandは`OVRInput.SetControllerVibration`へ写し、duration満了またはstopで左右個別に停止する。Quest APIのfrequency値は0〜320 Hzを0〜1へ正規化する。
+- VideoFrameのPassthrough flag受信時はMeta Passthrough underlayを有効にし、External Surface overlay全体へ固定alpha 0.82を適用する。
 - 接続候補は`127.0.0.1`（`adb reverse tcp:42424 tcp:42424`）を先に試し、指定されたWi-Fi hostへfallbackする。切断後は500 ms間隔で自動再接続する。
 - `adb shell am start` extrasでdiagnostic、host、Wi-Fi fallback、portを上書きできる。diagnostic modeは毎秒 `MAQUESTLINK_DIAGNOSTIC` JSONをlogcatへ出す。
 - `scripts/test_quest_client.sh` はXR非依存のprotocol/transportをEditModeで検証し、`scripts/build_quest_client.sh` はIL2CPP/ARM64 APKを生成する。
@@ -84,6 +91,14 @@
 - `scripts/test_phase7.sh`はrepository外へtarballを展開して自己完結性とchecksumを検証する。`scripts/test_phase7_clean.sh`はtarballだけを参照する一時Unity sampleでEditMode / Simulator PlayMode E2Eを行う。
 - native CIはGitHub-hosted `macos-15` arm64 runnerを使う。Quest APK CIはUnity license secretsを必要とする手動workflow。
 
-## 未実装
+### Quest拡張機能
 
-- Phase 8のQuest拡張機能
+- Mac layerは`XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND` / `ADDITIVE`、またはprojection layerの`XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT`を検出し、VideoFrameのPassthrough flagを設定する。
+- protocol v1のPassthrough flagは固定uniform alpha 0.82を意味する。H.264の画素alphaは伝送せず、QuestではPassthrough underlayの前に半透明の映像overlayを合成する近似方式。
+- mock E2Eはhaptic apply/stopの振幅・duration、左右26関節、Passthrough flagとalpha 0.82のsemanticを検証する。
+- Quest実機E2Eはhands送信、haptic受信、passthrough diagnosticを既存stream/input/clock条件に追加する。
+
+## 対応外
+
+- シーンアンカー、空間メッシュ、アイ／フェイストラッキング。
+- パススルー映像の画素alpha、black key、premultiplied alpha、HEVC with alpha。

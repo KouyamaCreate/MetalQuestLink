@@ -19,11 +19,34 @@ enum class MessageType : std::uint16_t {
   VideoFrame = 1,
   PoseInput = 2,
   Control = 3,
+  HapticCommand = 4,
+  HandTrackingInput = 5,
 };
+
+inline constexpr std::size_t kHandJointCount = 26;
 
 enum class VideoCodec : std::uint8_t {
   H264 = 1,
   Hevc = 2,
+};
+
+enum VideoFrameFlags : std::uint16_t {
+  KeyFrame = 1U << 0U,
+  Passthrough = 1U << 1U,
+  ChromaKeyTransparency = 1U << 2U,
+};
+
+// Protocol v1 maps Passthrough to an underlay plus fixed uniform overlay alpha.
+inline constexpr float kPassthroughApproximationAlpha = 0.82F;
+
+enum class HandSide : std::uint8_t {
+  Left = 1,
+  Right = 2,
+};
+
+enum class HapticAction : std::uint8_t {
+  Apply = 1,
+  Stop = 2,
 };
 
 enum class ControlKind : std::uint16_t {
@@ -119,7 +142,37 @@ struct ControlMessage {
   bool operator==(const ControlMessage&) const = default;
 };
 
-using Payload = std::variant<VideoFrame, PoseInput, ControlMessage>;
+struct HapticCommand {
+  std::uint64_t timestamp_ns{};
+  HandSide side{HandSide::Left};
+  HapticAction action{HapticAction::Apply};
+  std::uint16_t reserved{};
+  float amplitude{};
+  float frequency_hz{};
+  std::uint64_t duration_ns{};
+
+  bool operator==(const HapticCommand&) const = default;
+};
+
+struct HandJoint {
+  Pose pose{};
+  float radius{};
+
+  bool operator==(const HandJoint&) const = default;
+};
+
+struct HandTrackingInput {
+  std::uint64_t sample_timestamp_ns{};
+  bool left_active{};
+  bool right_active{};
+  std::array<HandJoint, kHandJointCount> left_joints{};
+  std::array<HandJoint, kHandJointCount> right_joints{};
+
+  bool operator==(const HandTrackingInput&) const = default;
+};
+
+using Payload =
+    std::variant<VideoFrame, PoseInput, ControlMessage, HapticCommand, HandTrackingInput>;
 
 struct Message {
   std::uint64_t sequence{};

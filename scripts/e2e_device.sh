@@ -62,10 +62,11 @@ LOGCAT_PID="$!"
 
 "$ADB" shell am start -S -n "$PACKAGE/$ACTIVITY" \
   --ez maquestlink_diagnostic true \
+  --ez maquestlink_passthrough true \
   --es maquestlink_host 127.0.0.1 \
   --ei maquestlink_port "$PORT"
 
-MAQUESTLINK_PORT="$PORT" \
+MAQUESTLINK_PORT="$PORT" MAQUESTLINK_VERIFY_INPUT=1 \
 MAQUESTLINK_TEST_FRAMES="${MAQUESTLINK_DEVICE_FRAMES:-2400}" \
   "$ROOT_DIR/scripts/test_phase1.sh" >"$PRODUCER_LOG" 2>&1 &
 PRODUCER_PID="$!"
@@ -83,6 +84,8 @@ MAX_DECODE="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"decode_fp
 MAX_POSE="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"pose_hz":([0-9]+).*/\1/' | sort -n | tail -1)"
 LAST_LATENCY="$(rg 'MAQUESTLINK_DIAGNOSTIC.*"clock_synced":true' "$LOGCAT_LOG" | \
   sed -nE 's/.*"capture_to_decode_ms":([0-9]+([.][0-9]+)?).*/\1/p' | tail -1)"
+MAX_HANDS="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"hands_sent":([0-9]+).*/\1/' | sort -n | tail -1)"
+MAX_HAPTICS="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"haptics_received":([0-9]+).*/\1/' | sort -n | tail -1)"
 
 if (( MAX_RECEIVE < 30 || MAX_DECODE < 30 || MAX_POSE < 60 )); then
   echo "Phase 4 device E2E failed: received_fps=$MAX_RECEIVE decode_fps=$MAX_DECODE pose_hz=$MAX_POSE" >&2
@@ -93,7 +96,12 @@ if ! rg -q 'MAQUESTLINK_DIAGNOSTIC.*"reprojection":"world_fixed".*"clock_synced"
   echo "Phase 6 device E2E failed: world-fixed reprojection or synchronized latency was not reported" >&2
   exit 1
 fi
+if (( MAX_HANDS < 1 || MAX_HAPTICS < 1 )) || \
+   ! rg -q 'MAQUESTLINK_DIAGNOSTIC.*"passthrough":"underlay_uniform_alpha"' "$LOGCAT_LOG"; then
+  echo "Phase 8 device E2E failed: hands_sent=$MAX_HANDS haptics_received=$MAX_HAPTICS or passthrough inactive" >&2
+  exit 1
+fi
 
-echo "MAQUESTLINK_DEVICE_E2E_OK received_fps=$MAX_RECEIVE decode_fps=$MAX_DECODE pose_hz=$MAX_POSE capture_to_decode_ms=$LAST_LATENCY"
+echo "MAQUESTLINK_DEVICE_E2E_OK received_fps=$MAX_RECEIVE decode_fps=$MAX_DECODE pose_hz=$MAX_POSE capture_to_decode_ms=$LAST_LATENCY hands_sent=$MAX_HANDS haptics_received=$MAX_HAPTICS passthrough=1"
 echo "Logcat: $LOGCAT_LOG"
 echo "Producer: $PRODUCER_LOG"

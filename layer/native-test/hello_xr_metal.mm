@@ -75,10 +75,18 @@ struct InputTest {
   XrAction primary_action{XR_NULL_HANDLE};
   XrAction trigger_action{XR_NULL_HANDLE};
   XrAction thumbstick_action{XR_NULL_HANDLE};
+  XrAction haptic_action{XR_NULL_HANDLE};
   XrSpace left_action_space{XR_NULL_HANDLE};
+  XrHandTrackerEXT left_hand_tracker{XR_NULL_HANDLE};
+  PFN_xrCreateHandTrackerEXT create_hand_tracker{};
+  PFN_xrLocateHandJointsEXT locate_hand_joints{};
+  PFN_xrDestroyHandTrackerEXT destroy_hand_tracker{};
   bool views_verified{};
   bool actions_verified{};
   bool space_verified{};
+  bool hand_verified{};
+  bool haptic_applied{};
+  bool haptic_stopped{};
 };
 
 [[nodiscard]] XrPosef identity_pose() {
@@ -106,6 +114,15 @@ struct InputTest {
   if (!enabled) {
     return test;
   }
+  check(xrGetInstanceProcAddr(instance, "xrCreateHandTrackerEXT",
+                              reinterpret_cast<PFN_xrVoidFunction*>(&test.create_hand_tracker)),
+        "xrGetInstanceProcAddr(xrCreateHandTrackerEXT)");
+  check(xrGetInstanceProcAddr(instance, "xrLocateHandJointsEXT",
+                              reinterpret_cast<PFN_xrVoidFunction*>(&test.locate_hand_joints)),
+        "xrGetInstanceProcAddr(xrLocateHandJointsEXT)");
+  check(xrGetInstanceProcAddr(instance, "xrDestroyHandTrackerEXT",
+                              reinterpret_cast<PFN_xrVoidFunction*>(&test.destroy_hand_tracker)),
+        "xrGetInstanceProcAddr(xrDestroyHandTrackerEXT)");
   check(xrStringToPath(instance, "/user/hand/left", &test.left_path),
         "xrStringToPath(left)");
   check(xrStringToPath(instance, "/user/hand/right", &test.right_path),
@@ -126,13 +143,15 @@ struct InputTest {
                                       "Trigger", subactions);
   test.thumbstick_action = create_action(test.action_set, XR_ACTION_TYPE_VECTOR2F_INPUT,
                                          "thumbstick", "Thumbstick", subactions);
+  test.haptic_action = create_action(test.action_set, XR_ACTION_TYPE_VIBRATION_OUTPUT,
+                                     "haptic", "Haptic", subactions);
 
   auto path = [instance](const char* value) {
     XrPath result{XR_NULL_PATH};
     check(xrStringToPath(instance, value, &result), "xrStringToPath(binding)");
     return result;
   };
-  const std::array<XrActionSuggestedBinding, 8> bindings = {{
+  const std::array<XrActionSuggestedBinding, 10> bindings = {{
       {.action = test.pose_action, .binding = path("/user/hand/left/input/grip/pose")},
       {.action = test.pose_action, .binding = path("/user/hand/right/input/grip/pose")},
       {.action = test.primary_action, .binding = path("/user/hand/left/input/x/click")},
@@ -141,6 +160,8 @@ struct InputTest {
       {.action = test.trigger_action, .binding = path("/user/hand/right/input/trigger/value")},
       {.action = test.thumbstick_action, .binding = path("/user/hand/left/input/thumbstick")},
       {.action = test.thumbstick_action, .binding = path("/user/hand/right/input/thumbstick")},
+      {.action = test.haptic_action, .binding = path("/user/hand/left/output/haptic")},
+      {.action = test.haptic_action, .binding = path("/user/hand/right/output/haptic")},
   }};
   XrPath profile{XR_NULL_PATH};
   check(xrStringToPath(instance, "/interaction_profiles/meta/touch_plus_controller", &profile),
@@ -178,6 +199,14 @@ void attach_input_test(XrSession session, InputTest& test) {
   };
   check(xrCreateActionSpace(session, &space_info, &test.left_action_space),
         "xrCreateActionSpace(left)");
+  const XrHandTrackerCreateInfoEXT hand_info{
+      .type = XR_TYPE_HAND_TRACKER_CREATE_INFO_EXT,
+      .next = nullptr,
+      .hand = XR_HAND_LEFT_EXT,
+      .handJointSet = XR_HAND_JOINT_SET_DEFAULT_EXT,
+  };
+  check(test.create_hand_tracker(session, &hand_info, &test.left_hand_tracker),
+        "xrCreateHandTrackerEXT(left)");
 }
 
 [[nodiscard]] bool near(float actual, float expected) {
@@ -231,6 +260,54 @@ void verify_input_state(XrSession session, XrSpace local_space, XrTime time,
       near(location.pose.position.z, -0.5F)) {
     test.space_verified = true;
   }
+
+  std::array<XrHandJointLocationEXT, XR_HAND_JOINT_COUNT_EXT> joints{};
+  XrHandJointLocationsEXT hand_locations{
+      .type = XR_TYPE_HAND_JOINT_LOCATIONS_EXT,
+      .next = nullptr,
+      .isActive = XR_FALSE,
+      .jointCount = static_cast<std::uint32_t>(joints.size()),
+      .jointLocations = joints.data(),
+  };
+  const XrHandJointsLocateInfoEXT hand_locate{
+      .type = XR_TYPE_HAND_JOINTS_LOCATE_INFO_EXT,
+      .next = nullptr,
+      .baseSpace = local_space,
+      .time = time,
+  };
+  if (XR_SUCCEEDED(test.locate_hand_joints(test.left_hand_tracker, &hand_locate,
+                                            &hand_locations)) &&
+      hand_locations.isActive &&
+      (joints[XR_HAND_JOINT_INDEX_TIP_EXT].locationFlags &
+       XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
+      near(joints[XR_HAND_JOINT_INDEX_TIP_EXT].pose.position.x, -0.24F) &&
+      near(joints[XR_HAND_JOINT_INDEX_TIP_EXT].pose.position.y, 1.12F) &&
+      near(joints[XR_HAND_JOINT_INDEX_TIP_EXT].radius, 0.008F)) {
+    test.hand_verified = true;
+  }
+
+  const XrHapticActionInfo haptic_info{
+      .type = XR_TYPE_HAPTIC_ACTION_INFO,
+      .next = nullptr,
+      .action = test.haptic_action,
+      .subactionPath = test.left_path,
+  };
+  if (!test.haptic_applied && test.actions_verified) {
+    const XrHapticVibration vibration{
+        .type = XR_TYPE_HAPTIC_VIBRATION,
+        .next = nullptr,
+        .duration = 20'000'000,
+        .frequency = 120.0F,
+        .amplitude = 0.6F,
+    };
+    check(xrApplyHapticFeedback(session, &haptic_info,
+                                reinterpret_cast<const XrHapticBaseHeader*>(&vibration)),
+          "xrApplyHapticFeedback");
+    test.haptic_applied = true;
+  } else if (test.haptic_applied && !test.haptic_stopped) {
+    check(xrStopHapticFeedback(session, &haptic_info), "xrStopHapticFeedback");
+    test.haptic_stopped = true;
+  }
 }
 
 void poll_events(XrInstance instance, XrSession session, SessionState& state) {
@@ -262,6 +339,7 @@ void poll_events(XrInstance instance, XrSession session, SessionState& state) {
 int run(int argc, char** argv) {
   const int requested_frames = parse_frame_count(argc, argv);
   const bool verify_input = std::getenv("MAQUESTLINK_VERIFY_INPUT") != nullptr;
+  const bool require_hands = std::getenv("MAQUESTLINK_REQUIRE_HANDS") != nullptr;
 
   std::uint32_t extension_count{};
   check(xrEnumerateInstanceExtensionProperties(nullptr, 0, &extension_count, nullptr),
@@ -275,9 +353,13 @@ int run(int argc, char** argv) {
   if (!has_extension(extensions, XR_KHR_METAL_ENABLE_EXTENSION_NAME)) {
     throw std::runtime_error("runtime does not expose XR_KHR_metal_enable");
   }
+  if (verify_input && !has_extension(extensions, XR_EXT_HAND_TRACKING_EXTENSION_NAME)) {
+    throw std::runtime_error("MaQuestLink layer does not expose XR_EXT_hand_tracking");
+  }
   std::cout << "metal_extension=" << XR_KHR_METAL_ENABLE_EXTENSION_NAME << '\n';
 
-  const char* enabled_extensions[] = {XR_KHR_METAL_ENABLE_EXTENSION_NAME};
+  std::vector<const char*> enabled_extensions{XR_KHR_METAL_ENABLE_EXTENSION_NAME};
+  if (verify_input) enabled_extensions.push_back(XR_EXT_HAND_TRACKING_EXTENSION_NAME);
   XrInstanceCreateInfo instance_info{.type = XR_TYPE_INSTANCE_CREATE_INFO, .next = nullptr};
   std::strncpy(instance_info.applicationInfo.applicationName, "MaQuestLinkNativeTest",
                XR_MAX_APPLICATION_NAME_SIZE - 1);
@@ -287,8 +369,8 @@ int run(int argc, char** argv) {
   instance_info.applicationInfo.engineVersion = 1;
   instance_info.applicationInfo.apiVersion = verify_input ? XR_MAKE_VERSION(1, 1, 0)
                                                           : XR_MAKE_VERSION(1, 0, 0);
-  instance_info.enabledExtensionCount = 1;
-  instance_info.enabledExtensionNames = enabled_extensions;
+  instance_info.enabledExtensionCount = static_cast<std::uint32_t>(enabled_extensions.size());
+  instance_info.enabledExtensionNames = enabled_extensions.data();
 
   XrInstance instance{XR_NULL_HANDLE};
   check(xrCreateInstance(&instance_info, &instance), "xrCreateInstance");
@@ -308,6 +390,22 @@ int run(int argc, char** argv) {
   };
   XrSystemId system_id{XR_NULL_SYSTEM_ID};
   check(xrGetSystem(instance, &system_info, &system_id), "xrGetSystem");
+  if (verify_input) {
+    XrSystemHandTrackingPropertiesEXT hand_properties{
+        .type = XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT,
+        .next = nullptr,
+        .supportsHandTracking = XR_FALSE,
+    };
+    XrSystemProperties properties{
+        .type = XR_TYPE_SYSTEM_PROPERTIES,
+        .next = &hand_properties,
+    };
+    check(xrGetSystemProperties(instance, system_id, &properties),
+          "xrGetSystemProperties(hand tracking)");
+    if (!hand_properties.supportsHandTracking) {
+      throw std::runtime_error("MaQuestLink layer did not report hand tracking support");
+    }
+  }
 
   PFN_xrGetMetalGraphicsRequirementsKHR get_metal_requirements{};
   check(xrGetInstanceProcAddr(
@@ -465,7 +563,10 @@ int run(int argc, char** argv) {
 
     std::vector<XrCompositionLayerProjectionView> projection_views;
     XrCompositionLayerProjection projection{
-        .type = XR_TYPE_COMPOSITION_LAYER_PROJECTION, .next = nullptr};
+        .type = XR_TYPE_COMPOSITION_LAYER_PROJECTION,
+        .next = nullptr,
+        .layerFlags = verify_input ? XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT : 0,
+    };
     const XrCompositionLayerBaseHeader* layers[1]{};
     std::uint32_t layer_count = 0;
 
@@ -537,12 +638,18 @@ int run(int argc, char** argv) {
     ++rendered_frames;
   }
 
-  if (verify_input &&
-      (!input_test.views_verified || !input_test.actions_verified || !input_test.space_verified)) {
+  if (verify_input && (!input_test.views_verified || !input_test.actions_verified ||
+                       !input_test.space_verified || (require_hands && !input_test.hand_verified) ||
+                       !input_test.haptic_applied || !input_test.haptic_stopped)) {
     throw std::runtime_error("synthetic input was not observed through all OpenXR APIs");
   }
   if (verify_input) {
-    std::cout << "MAQUESTLINK_INPUT_E2E_OK views=1 actions=1 space=1\n";
+    std::cout << "MAQUESTLINK_INPUT_E2E_OK views=1 actions=1 space=1 hands="
+              << input_test.hand_verified << " haptics=1\n";
+  }
+  if (input_test.left_hand_tracker != XR_NULL_HANDLE) {
+    check(input_test.destroy_hand_tracker(input_test.left_hand_tracker),
+          "xrDestroyHandTrackerEXT");
   }
   if (input_test.left_action_space != XR_NULL_HANDLE) {
     check(xrDestroySpace(input_test.left_action_space), "xrDestroySpace(action)");

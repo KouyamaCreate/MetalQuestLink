@@ -147,6 +147,15 @@ void write_eye_view(Writer& writer, const EyeView& view) {
   writer.write(view.fov.angle_down);
 }
 
+void write_hand_joint(Writer& writer, const HandJoint& joint) {
+  write_pose(writer, joint.pose);
+  writer.write(joint.radius);
+}
+
+[[nodiscard]] HandJoint read_hand_joint(Reader& reader) {
+  return {.pose = read_pose(reader), .radius = reader.read<float>()};
+}
+
 [[nodiscard]] EyeView read_eye_view(Reader& reader) {
   EyeView view;
   view.pose = read_pose(reader);
@@ -165,8 +174,12 @@ void write_eye_view(Writer& writer, const EyeView& view) {
           return MessageType::VideoFrame;
         } else if constexpr (std::is_same_v<T, PoseInput>) {
           return MessageType::PoseInput;
-        } else {
+        } else if constexpr (std::is_same_v<T, ControlMessage>) {
           return MessageType::Control;
+        } else if constexpr (std::is_same_v<T, HapticCommand>) {
+          return MessageType::HapticCommand;
+        } else {
+          return MessageType::HandTrackingInput;
         }
       },
       payload);
@@ -197,7 +210,7 @@ void write_eye_view(Writer& writer, const EyeView& view) {
           write_pose(writer, value.head);
           write_controller(writer, value.left);
           write_controller(writer, value.right);
-        } else {
+        } else if constexpr (std::is_same_v<T, ControlMessage>) {
           writer.write(value.kind);
           writer.write(value.flags);
           writer.write(value.timestamp_ns);
@@ -206,6 +219,21 @@ void write_eye_view(Writer& writer, const EyeView& view) {
           }
           writer.write(static_cast<std::uint32_t>(value.data.size()));
           writer.write_bytes(value.data);
+        } else if constexpr (std::is_same_v<T, HapticCommand>) {
+          writer.write(value.timestamp_ns);
+          writer.write(value.side);
+          writer.write(value.action);
+          writer.write(value.reserved);
+          writer.write(value.amplitude);
+          writer.write(value.frequency_hz);
+          writer.write(value.duration_ns);
+        } else {
+          writer.write(value.sample_timestamp_ns);
+          writer.write(static_cast<std::uint8_t>(value.left_active));
+          writer.write(static_cast<std::uint8_t>(value.right_active));
+          writer.write(static_cast<std::uint16_t>(kHandJointCount));
+          for (const auto& joint : value.left_joints) write_hand_joint(writer, joint);
+          for (const auto& joint : value.right_joints) write_hand_joint(writer, joint);
         }
       },
       payload);
@@ -256,6 +284,36 @@ void require_no_trailing_bytes(const Reader& reader) {
       require_no_trailing_bytes(reader);
       return value;
     }
+    case MessageType::HapticCommand: {
+      HapticCommand value;
+      value.timestamp_ns = reader.read<std::uint64_t>();
+      value.side = reader.read<HandSide>();
+      value.action = reader.read<HapticAction>();
+      value.reserved = reader.read<std::uint16_t>();
+      value.amplitude = reader.read<float>();
+      value.frequency_hz = reader.read<float>();
+      value.duration_ns = reader.read<std::uint64_t>();
+      if ((value.side != HandSide::Left && value.side != HandSide::Right) ||
+          (value.action != HapticAction::Apply && value.action != HapticAction::Stop)) {
+        throw ProtocolError("invalid haptic command enum value");
+      }
+      require_no_trailing_bytes(reader);
+      return value;
+    }
+    case MessageType::HandTrackingInput: {
+      HandTrackingInput value;
+      value.sample_timestamp_ns = reader.read<std::uint64_t>();
+      value.left_active = reader.read<std::uint8_t>() != 0;
+      value.right_active = reader.read<std::uint8_t>() != 0;
+      const auto joint_count = reader.read<std::uint16_t>();
+      if (joint_count != kHandJointCount) {
+        throw ProtocolError("hand tracking joint count is not 26");
+      }
+      for (auto& joint : value.left_joints) joint = read_hand_joint(reader);
+      for (auto& joint : value.right_joints) joint = read_hand_joint(reader);
+      require_no_trailing_bytes(reader);
+      return value;
+    }
   }
   throw ProtocolError("unknown message type");
 }
@@ -286,6 +344,8 @@ MessageHeader parse_header(std::span<const std::byte> bytes) {
     case MessageType::VideoFrame:
     case MessageType::PoseInput:
     case MessageType::Control:
+    case MessageType::HapticCommand:
+    case MessageType::HandTrackingInput:
       break;
     default:
       throw ProtocolError("unknown message type");

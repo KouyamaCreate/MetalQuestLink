@@ -4,9 +4,10 @@ Apple Silicon MacのUnity Editor Play ModeをMeta Quest 3 / 3Sでプレビュー
 Meta XR SimulatorをMac側OpenXR runtimeとして使い、implicit OpenXR API layerが左右眼映像をQuestへ送り、
 QuestのHMD・Touch入力をUnityへ差し戻します。
 
-現在はPhase 7まで実装済みです。Quest実機を使わないMac/Simulator E2Eは自動検証済みです。
+Phase 0〜8を実装済みです。Quest実機を使わないMac/Simulator E2Eは自動検証済みです。
 Quest APKのbuildも成功していますが、この開発環境にはQuest 3が接続されていないため、実機表示と
-capture-to-decode遅延の最終実測だけは未完了です。詳細は [実装進捗](docs/progress.md) を参照してください。
+capture-to-decode遅延、手追跡、振動、パススルーの実機最終確認は未完了です。詳細は
+[実装進捗](docs/progress.md) を参照してください。
 
 ## 利用に必要なもの
 
@@ -37,12 +38,30 @@ flowchart LR
     Client --> Decoder[MediaCodec External Surface]
     Decoder --> Overlay[OVROverlay world-fixed Quad]
     QuestInput[Quest HMD / Touch input] -->|PoseInput 72 Hz| TCP
+    QuestHands[Quest hand joints] -->|HandTrackingInput 26 joints| TCP
     TCP -->|view / space / action注入| Layer
+    Layer -->|HapticCommand| QuestInput
 ```
 
 映像はUnity textureへ戻さず、VideoToolboxからMediaCodec、Meta compositorのExternal Surfaceへ渡します。
 各VideoFrameにはMacが描画した左右眼pose/FOVが含まれます。Quest側はそのrender poseへQuadをworld固定し、
 受信後の頭部移動をQuest compositorの再投影で補正します。このworld-fixed modeが既定です。
+
+## Quest機能対応状況
+
+| 機能 | 状態 | 実装と制約 |
+|---|---|---|
+| HMD / Touch Plus入力 | 対応 | pose、click / touch、thumbstick、trigger、gripを最新値優先で送信 |
+| コントローラハプティクス | 対応 | `xrApplyHapticFeedback` / `xrStopHapticFeedback`の左右、振幅、周波数、持続時間をQuestへ転送。mock E2E済み、実機振動は未確認 |
+| ハンドトラッキング | 対応 | `XR_EXT_hand_tracking`の左右26関節、radius、有効／追跡flagを60 Hz以上で送信。合成joint E2E済み、実機trackingは未確認 |
+| パススルー | 近似対応 | alpha/additive blendまたはsource-alpha layerを検出し、Quest Passthrough underlayと固定uniform alpha `0.82`の映像overlayで合成。検出flagとalpha復元E2E済み、実機合成は未確認 |
+| シーンアンカー | 対応外 | protocol拡張余地のみ |
+| 空間メッシュ | 対応外 | protocol拡張余地のみ |
+| アイ／フェイストラッキング | 対応外 | Quest 3 / 3S対象のため実装しない |
+
+パススルー近似はH.264映像の画素ごとのalphaを保持しません。透明領域を正確に復元する方式ではなく、
+Mac側で透過合成の要求を検出したフレーム全体へalpha `0.82`を適用してunderlayを見せます。
+HEVC with alphaはQuest MediaCodecでの対応を実機検証できず、protocol v1では採用していません。
 
 ## ゼロからPlayするまで
 
@@ -126,8 +145,9 @@ scripts/e2e_device.sh
 ```
 
 このscriptはAPK install、adb reverse、無装着用power automation、起動、stream、logcat判定、後片付けを行い、
-receive/decode 30 fps以上、PoseInput 60 Hz以上、world-fixed mode、clock syncを要求します。成功時は
-`capture_to_decode_ms`も出力します。実機未接続なら変更を加えずexit code 2で終了します。
+receive/decode 30 fps以上、PoseInput 60 Hz以上、world-fixed mode、clock sync、hand sample、haptic受信、
+passthrough underlayを要求します。成功時は`capture_to_decode_ms`も出力します。実機未接続なら変更を加えず
+exit code 2で終了します。
 
 ## レイテンシ計測
 
@@ -241,17 +261,19 @@ scripts/build_quest_client.sh
 scripts/test_phase5.sh
 scripts/test_phase7.sh
 scripts/test_phase7_clean.sh
+scripts/test_phase8.sh
 # Quest実機を接続した場合
 scripts/e2e_device.sh
 ```
 
 - `test_phase1.sh`: Meta XR Simulator Metal frame loopとlayer load
 - `test_phase2.sh`: 未接続pass-through、H.264 encode/decode 30 fps以上
-- `test_phase3.sh`: 映像、合成HMD/controller入力注入、Ping/Pong clock sync
-- `test_quest_client.sh`: C# protocol、transport、clock換算、world-fixed poseのEditMode test
+- `test_phase3.sh`: 映像、合成HMD/controller/hand入力注入、haptic、passthrough近似、Ping/Pong clock sync
+- `test_quest_client.sh`: C# protocol、transport、clock換算、world-fixed pose、Quest機能mappingのEditMode test
 - `test_phase5.sh`: Editor packageとsampleのMeta XR Simulator PlayMode E2E
 - `test_phase7.sh`: 配布4点、checksum、repository外展開、doctor
 - `test_phase7_clean.sh`: tarballだけを使うrepository外Unity/Simulator E2E
+- `test_phase8.sh`: Phase 0〜8全回帰。Quest未接続時はdevice E2Eだけを保留扱いにする
 
 ## トラブルシューティング
 
@@ -291,6 +313,8 @@ scripts/e2e_device.sh
 - 対象はApple Silicon、Quest 3 / 3S、Unity 6000.3.6f1で検証した構成です。
 - 現在の公開想定binaryはad-hoc署名で、Apple Developer ID公証済みではありません。download経路によってはGatekeeper対応が必要です。
 - Quest実機でのMediaCodec External Surface表示、実fps/pose rate、capture-to-decode値はこの環境では未実測です。
+- Quest実機の26関節取得、Touch振動、Passthrough underlayとuniform alphaの見え方は未実測です。
+- パススルーは固定uniform alpha近似で、画素alpha、black key、premultiplied alpha、HEVC alphaには対応しません。
 - world-fixed Quadはrender head poseを使うcompositor再投影です。depth-aware / spacewarpではありません。
 - 映像は左右眼が同じBGRA 2D-array swapchainであるUnity/Simulator構成を前提にします。
 - protocol v1のcontroller poseはgrip/aimで共通、IPDはMac側注入時に64 mm固定です。
@@ -299,4 +323,5 @@ scripts/e2e_device.sh
   OpenXR resource破棄後にvendor static destructorを迂回します。
 
 詳細設計は [仕様](docs/spec.md)、実測値は [調査メモ](docs/notes.md)、Phase 7の配布結果は
-[最終レポート](docs/phase7-report.md)、実装順は [plan](docs/plan.md) を参照してください。
+[Phase 7レポート](docs/phase7-report.md)、全フェーズの結果は [最終レポート](docs/final-report.md)、
+実装順は [plan](docs/plan.md) を参照してください。

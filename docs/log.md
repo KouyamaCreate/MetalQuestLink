@@ -202,3 +202,30 @@
 ### Phase 7 残り
 
 - Quest未接続のため配布APKの実機無装着E2Eは、接続後の実行手順を残す。
+
+### Phase 8 変更
+
+- HapticCommandとHandTrackingInputをC++ / C# protocolへ追加し、全二重transportへ統合した。
+- layerへhaptic apply/stop、`XR_EXT_hand_tracking` system/create/locate/destroy hookを追加した。
+- Quest clientへXR Hands 26関節sampling、Touch vibration、Meta Passthrough underlayを追加した。
+- Macの透過合成要求をVideoFrame flagへ写し、Questで固定uniform alpha 0.82を適用する近似方式を追加した。
+- mock/native/Quest/device E2EとPhase 0〜8全回帰scriptを更新した。
+- Android OpenXR feature ID衝突を検出し、XR Hands Hand Tracking Subsystemを型で選ぶよう修正した。
+- READMEへQuest機能対応状況とパススルー近似の限界を追加した。
+
+### Phase 8 理由
+
+- controller入力以外で価値と実現性の高いQuest機能を既存のAPI layer / TCP構成へ追加し、対応範囲を利用者が判断できるようにするため。
+
+### Phase 8 影響
+
+- `layer/include/maquestlink/protocol.hpp`、`layer/src/`、`layer/native-test/`、`layer/tools/`、`layer/tests/`
+- `quest-client/Assets/MaQuestLink/Runtime/`、`Editor/`、`Tests/EditMode/`、Quest / OpenXR project settings
+- `editor-package/Native~/`、`editor-package/QuestClient~/`、`dist/`
+- `scripts/test_phase3.sh`、`test_phase8.sh`、`e2e_device.sh`
+- `README.md`、`docs/`、`session.md`
+
+### Phase 8 残り
+
+- Quest未接続のため、実機のMediaCodec表示、26関節60 Hz、Touch振動、Passthrough underlay / uniform alpha合成は未確認。
+- シーンアンカー、空間メッシュ、アイ／フェイストラッキング、画素alphaは明示的にスコープ外。

@@ -16,15 +16,20 @@ namespace MaQuestLink.QuestClient
         private readonly Queue<VideoFrame> videoQueue = new Queue<VideoFrame>(3);
         private readonly object poseLock = new object();
         private readonly SemaphoreSlim poseReady = new SemaphoreSlim(0, 1);
+        private readonly object hapticLock = new object();
+        private readonly Queue<HapticCommand> hapticQueue = new Queue<HapticCommand>(8);
 
         private CancellationTokenSource cancellation;
         private Task connectionTask;
         private PoseInput latestPose;
+        private HandTrackingInput latestHands;
         private string[] hosts = Array.Empty<string>();
         private int port;
         private long sequence;
         private long receivedFrames;
         private long sentPoses;
+        private long sentHands;
+        private long receivedHaptics;
         private long droppedFrames;
         private int connected;
         private readonly ClockSynchronizer clock = new ClockSynchronizer();
@@ -33,6 +38,8 @@ namespace MaQuestLink.QuestClient
         public bool IsConnected => Volatile.Read(ref connected) != 0;
         public long ReceivedFrames => Interlocked.Read(ref receivedFrames);
         public long SentPoses => Interlocked.Read(ref sentPoses);
+        public long SentHands => Interlocked.Read(ref sentHands);
+        public long ReceivedHaptics => Interlocked.Read(ref receivedHaptics);
         public long DroppedFrames => Interlocked.Read(ref droppedFrames);
         public string ConnectedHost { get; private set; } = string.Empty;
         public bool HasClockSync => clock.IsSynchronized;
@@ -96,6 +103,10 @@ namespace MaQuestLink.QuestClient
             {
                 videoQueue.Clear();
             }
+            lock (hapticLock)
+            {
+                hapticQueue.Clear();
+            }
         }
 
         public void SubmitLatestPose(PoseInput pose)
@@ -114,6 +125,14 @@ namespace MaQuestLink.QuestClient
             }
         }
 
+        public void SubmitLatestHands(HandTrackingInput hands)
+        {
+            lock (poseLock)
+            {
+                latestHands = hands;
+            }
+        }
+
         public bool TryDequeueLatestVideo(out VideoFrame frame)
         {
             lock (videoLock)
@@ -129,6 +148,20 @@ namespace MaQuestLink.QuestClient
                     Interlocked.Increment(ref droppedFrames);
                 }
                 frame = videoQueue.Dequeue();
+                return true;
+            }
+        }
+
+        public bool TryDequeueHaptic(out HapticCommand command)
+        {
+            lock (hapticLock)
+            {
+                if (hapticQueue.Count == 0)
+                {
+                    command = null;
+                    return false;
+                }
+                command = hapticQueue.Dequeue();
                 return true;
             }
         }
@@ -232,6 +265,15 @@ namespace MaQuestLink.QuestClient
                     clock.Update(ReadUInt64LittleEndian(control.Data), control.TimestampNs,
                         ClockSynchronizer.NowNs());
                 }
+                else if (message.Payload is HapticCommand haptic)
+                {
+                    lock (hapticLock)
+                    {
+                        while (hapticQueue.Count >= 8) hapticQueue.Dequeue();
+                        hapticQueue.Enqueue(haptic);
+                    }
+                    Interlocked.Increment(ref receivedHaptics);
+                }
             }
         }
 
@@ -241,9 +283,11 @@ namespace MaQuestLink.QuestClient
             {
                 await poseReady.WaitAsync(token).ConfigureAwait(false);
                 PoseInput pose;
+                HandTrackingInput hands;
                 lock (poseLock)
                 {
                     pose = latestPose;
+                    hands = latestHands;
                 }
                 var now = ClockSynchronizer.NowNs();
                 if (lastPingTimestampNs == 0 || now - lastPingTimestampNs >= 1_000_000_000ul)
@@ -262,6 +306,13 @@ namespace MaQuestLink.QuestClient
                     unchecked((ulong)Interlocked.Increment(ref sequence)), pose));
                 await stream.WriteAsync(bytes, 0, bytes.Length, token).ConfigureAwait(false);
                 Interlocked.Increment(ref sentPoses);
+                if (hands != null)
+                {
+                    var handBytes = Protocol.Serialize(new WireMessage(
+                        unchecked((ulong)Interlocked.Increment(ref sequence)), hands));
+                    await stream.WriteAsync(handBytes, 0, handBytes.Length, token).ConfigureAwait(false);
+                    Interlocked.Increment(ref sentHands);
+                }
             }
         }
 

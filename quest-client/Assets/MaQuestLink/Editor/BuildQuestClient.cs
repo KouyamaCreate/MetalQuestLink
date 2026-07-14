@@ -10,6 +10,8 @@ using UnityEditor.XR.Management.Metadata;
 using UnityEditor.XR.OpenXR.Features;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.XR.Hands.OpenXR;
+using UnityEngine.XR.OpenXR;
 
 namespace MaQuestLink.QuestClient.Editor
 {
@@ -63,6 +65,7 @@ namespace MaQuestLink.QuestClient.Editor
             QualitySettings.vSyncCount = 0;
             Application.targetFrameRate = 72;
             EnableAndroidOpenXr();
+            ConfigureMetaCapabilities();
             AssetDatabase.SaveAssets();
         }
 
@@ -118,6 +121,18 @@ namespace MaQuestLink.QuestClient.Editor
                     ConfigureQuest3Targets(feature);
                 }
             }
+
+            // Unity OpenXR's Microsoft Hand Interaction Profile and XR Hands' Hand Tracking
+            // Subsystem currently publish the same feature ID. Select by type so the Quest
+            // build enables XR_EXT_hand_tracking instead of XR_MSFT_hand_interaction.
+            var openXrSettings = OpenXRSettings.GetSettingsForBuildTargetGroup(BuildTargetGroup.Android);
+            var handTracking = openXrSettings?.GetFeature<HandTracking>();
+            if (handTracking == null)
+            {
+                throw new InvalidOperationException("XR Hands Hand Tracking Subsystem feature not found");
+            }
+            handTracking.enabled = true;
+            EditorUtility.SetDirty(handTracking);
         }
 
         private static void ConfigureQuest3Targets(UnityEngine.Object metaQuestFeature)
@@ -139,6 +154,47 @@ namespace MaQuestLink.QuestClient.Editor
                 }
             }
             serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void ConfigureMetaCapabilities()
+        {
+            var configType = FindType("OVRProjectConfig");
+            var config = configType?.GetProperty(
+                "CachedProjectConfig", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+            if (config == null)
+            {
+                throw new InvalidOperationException("OVRProjectConfig could not be loaded");
+            }
+            SetEnumField(config, configType, "handTrackingSupport", "ControllersAndHands");
+            SetEnumField(config, configType, "handTrackingFrequency", "HIGH");
+            SetEnumProperty(config, configType, "insightPassthroughSupport", "Supported");
+            EditorUtility.SetDirty((UnityEngine.Object)config);
+        }
+
+        private static void SetEnumField(object target, Type type, string name, string value)
+        {
+            var field = type.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (field == null || !field.FieldType.IsEnum)
+                throw new InvalidOperationException($"Meta XR config field was not found: {name}");
+            field.SetValue(target, Enum.Parse(field.FieldType, value));
+        }
+
+        private static void SetEnumProperty(object target, Type type, string name, string value)
+        {
+            var property = type.GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (property?.CanWrite != true || !property.PropertyType.IsEnum)
+                throw new InvalidOperationException($"Meta XR config property was not found: {name}");
+            property.SetValue(target, Enum.Parse(property.PropertyType, value));
+        }
+
+        private static Type FindType(string typeName)
+        {
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var type = assembly.GetType(typeName, false);
+                if (type != null) return type;
+            }
+            return null;
         }
 
         private static void BuildScene()

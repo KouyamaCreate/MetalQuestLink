@@ -12,10 +12,12 @@ namespace MaQuestLink.QuestClient
         [SerializeField] private string wifiFallbackHost = string.Empty;
         [SerializeField] private int port = DefaultPort;
         [SerializeField] private bool diagnosticMode;
+        [SerializeField] private bool passthroughMode;
         [SerializeField] private ExternalSurfacePresenter presenter;
 
         private StreamTransport transport;
         private MediaCodecDecoder decoder;
+        private QuestHaptics haptics;
         private float nextDiagnosticTime;
         private long previousReceived;
         private long previousDecoded;
@@ -32,6 +34,7 @@ namespace MaQuestLink.QuestClient
             }
             transport = new StreamTransport();
             decoder = new MediaCodecDecoder();
+            haptics = new QuestHaptics();
         }
 
         private void Start()
@@ -42,13 +45,21 @@ namespace MaQuestLink.QuestClient
                 candidates.Add(wifiFallbackHost);
             }
             transport.Start(candidates, port);
+            if (passthroughMode) EnablePassthrough();
             nextDiagnosticTime = Time.unscaledTime + 1.0f;
         }
 
         private void Update()
         {
             // Update follows the Quest display cadence (72/80/90Hz), satisfying the >=60Hz input path.
-            transport.SubmitLatestPose(QuestInputSampler.Sample());
+            var pose = QuestInputSampler.Sample();
+            transport.SubmitLatestHands(QuestHandSampler.Sample(pose.SampleTimestampNs));
+            transport.SubmitLatestPose(pose);
+            while (transport.TryDequeueHaptic(out var haptic))
+            {
+                haptics.Apply(haptic, ClockSynchronizer.NowNs());
+            }
+            haptics.Tick(ClockSynchronizer.NowNs());
             if (transport.TryDequeueLatestVideo(out var frame))
             {
                 Present(frame);
@@ -63,11 +74,17 @@ namespace MaQuestLink.QuestClient
         private void OnDestroy()
         {
             decoder?.Dispose();
+            haptics?.Dispose();
             transport?.Dispose();
         }
 
         private void Present(VideoFrame frame)
         {
+            if (((VideoFrameFlags)frame.Flags & VideoFrameFlags.Passthrough) != 0 && !passthroughMode)
+            {
+                passthroughMode = true;
+                EnablePassthrough();
+            }
             presenter.ApplyRenderPose(frame);
             captureToReceiveMs = transport.EstimateHostAgeMs(
                 frame.CaptureTimestampNs, frame.ReceiveTimestampNs);
@@ -98,6 +115,8 @@ namespace MaQuestLink.QuestClient
                 received = received,
                 decoded = decoded,
                 poses_sent = sent,
+                hands_sent = transport.SentHands,
+                haptics_received = transport.ReceivedHaptics,
                 received_fps = received - previousReceived,
                 decode_fps = decoded - previousDecoded,
                 pose_hz = sent - previousSent,
@@ -108,6 +127,7 @@ namespace MaQuestLink.QuestClient
                 clock_rtt_ms = transport.ClockRoundTripMs,
                 capture_to_receive_ms = captureToReceiveMs,
                 capture_to_decode_ms = decoder.CaptureToDecodeMs,
+                passthrough = passthroughMode ? "underlay_uniform_alpha" : "disabled",
             };
             previousReceived = received;
             previousDecoded = decoded;
@@ -128,6 +148,7 @@ namespace MaQuestLink.QuestClient
                     host = intent.Call<string>("getStringExtra", "maquestlink_host") ?? host;
                     wifiFallbackHost = intent.Call<string>("getStringExtra", "maquestlink_wifi_host") ?? wifiFallbackHost;
                     port = intent.Call<int>("getIntExtra", "maquestlink_port", port);
+                    passthroughMode = intent.Call<bool>("getBooleanExtra", "maquestlink_passthrough", passthroughMode);
                 }
             }
             catch (Exception exception)
@@ -135,6 +156,15 @@ namespace MaQuestLink.QuestClient
                 Debug.LogWarning($"MaQuestLink Android extras could not be read: {exception.Message}");
             }
 #endif
+        }
+
+        private void EnablePassthrough()
+        {
+            presenter.SetPassthroughApproximation(true);
+            if (!PassthroughConfigurator.EnableUnderlay())
+            {
+                Debug.LogWarning("MaQuestLink passthrough underlay could not be enabled");
+            }
         }
 
         [Serializable]
@@ -145,6 +175,8 @@ namespace MaQuestLink.QuestClient
             public long received;
             public long decoded;
             public long poses_sent;
+            public long hands_sent;
+            public long haptics_received;
             public long received_fps;
             public long decode_fps;
             public long pose_hz;
@@ -155,6 +187,7 @@ namespace MaQuestLink.QuestClient
             public double clock_rtt_ms;
             public double capture_to_receive_ms;
             public double capture_to_decode_ms;
+            public string passthrough;
         }
     }
 }

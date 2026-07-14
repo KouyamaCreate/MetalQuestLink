@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -35,6 +37,7 @@ enum class Component {
   Grip,
   Thumbstick,
   Pose,
+  Haptic,
 };
 enum class SpaceSource { Local, Head, LeftController, RightController };
 
@@ -69,12 +72,21 @@ struct SpaceData {
                  .position = {.x = 0, .y = 0, .z = 0}};
 };
 
+struct HandTrackerData {
+  XrInstance instance{XR_NULL_HANDLE};
+  XrSession session{XR_NULL_HANDLE};
+  protocol::HandSide side{protocol::HandSide::Left};
+};
+
 std::mutex g_mutex;
 std::map<XrInstance, InstanceData> g_instances;
 std::map<XrSession, XrInstance> g_sessions;
 std::map<XrActionSet, ActionSetData> g_action_sets;
 std::map<XrAction, ActionData> g_actions;
 std::map<XrSpace, SpaceData> g_spaces;
+std::map<XrHandTrackerEXT, HandTrackerData> g_hand_trackers;
+std::atomic<std::uint64_t> g_next_haptic_sequence{1};
+std::atomic<std::uintptr_t> g_next_hand_tracker{1};
 using StateKey = std::tuple<XrSession, XrAction, XrPath>;
 std::map<StateKey, XrBool32> g_boolean_states;
 std::map<StateKey, float> g_float_states;
@@ -188,6 +200,9 @@ template <typename Function>
   }
   if (path.ends_with("/input/grip/pose") || path.ends_with("/input/aim/pose")) {
     return Component::Pose;
+  }
+  if (path.ends_with("/output/haptic")) {
+    return Component::Haptic;
   }
   return Component::None;
 }
@@ -334,6 +349,46 @@ template <typename Function>
     if (button_value(controller, binding.component)) return 1.0F;
   }
   return 0.0F;
+}
+
+[[nodiscard]] std::uint64_t monotonic_now_ns() {
+  return static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::steady_clock::now().time_since_epoch())
+          .count());
+}
+
+[[nodiscard]] std::vector<Side> haptic_sides(XrInstance instance,
+                                              const XrHapticActionInfo* info) {
+  if (info == nullptr) return {};
+  const Side requested = side_for_path(instance, info->subactionPath);
+  if (requested != Side::None) return {requested};
+  std::vector<Side> result;
+  for (const auto& binding : bindings_for_action(info->action, XR_NULL_PATH)) {
+    if (binding.component == Component::Haptic && binding.side != Side::None &&
+        std::find(result.begin(), result.end(), binding.side) == result.end()) {
+      result.push_back(binding.side);
+    }
+  }
+  return result;
+}
+
+void send_haptic(const std::vector<Side>& sides, protocol::HapticAction action,
+                 float amplitude, float frequency_hz, std::uint64_t duration_ns) {
+  for (const Side side : sides) {
+    transport_send(protocol::Message{
+        .sequence = g_next_haptic_sequence.fetch_add(1),
+        .payload = protocol::HapticCommand{
+            .timestamp_ns = monotonic_now_ns(),
+            .side = side == Side::Right ? protocol::HandSide::Right
+                                       : protocol::HandSide::Left,
+            .action = action,
+            .amplitude = amplitude,
+            .frequency_hz = frequency_hz,
+            .duration_ns = duration_ns,
+        },
+    });
+  }
 }
 
 XRAPI_ATTR XrResult XRAPI_CALL hook_create_action_set(XrInstance instance,
@@ -656,6 +711,136 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_get_pose(XrSession session,
   return result;
 }
 
+XRAPI_ATTR XrResult XRAPI_CALL hook_apply_haptic(
+    XrSession session, const XrHapticActionInfo* info, const XrHapticBaseHeader* feedback) {
+  const XrInstance instance = instance_for_session(session);
+  const auto next = next_function<PFN_xrApplyHapticFeedback>(instance, "xrApplyHapticFeedback");
+  const XrResult result = next == nullptr ? XR_ERROR_HANDLE_INVALID
+                                          : next(session, info, feedback);
+  if (XR_SUCCEEDED(result) && info != nullptr && feedback != nullptr &&
+      feedback->type == XR_TYPE_HAPTIC_VIBRATION) {
+    const auto* vibration = reinterpret_cast<const XrHapticVibration*>(feedback);
+    send_haptic(haptic_sides(instance, info), protocol::HapticAction::Apply,
+                std::clamp(vibration->amplitude, 0.0F, 1.0F), vibration->frequency,
+                vibration->duration > 0 ? static_cast<std::uint64_t>(vibration->duration) : 0);
+  }
+  return result;
+}
+
+XRAPI_ATTR XrResult XRAPI_CALL hook_stop_haptic(XrSession session,
+                                                 const XrHapticActionInfo* info) {
+  const XrInstance instance = instance_for_session(session);
+  const auto next = next_function<PFN_xrStopHapticFeedback>(instance, "xrStopHapticFeedback");
+  const XrResult result = next == nullptr ? XR_ERROR_HANDLE_INVALID : next(session, info);
+  if (XR_SUCCEEDED(result) && info != nullptr) {
+    send_haptic(haptic_sides(instance, info), protocol::HapticAction::Stop, 0, 0, 0);
+  }
+  return result;
+}
+
+XRAPI_ATTR XrResult XRAPI_CALL hook_get_system_properties(
+    XrInstance instance, XrSystemId system_id, XrSystemProperties* properties) {
+  const auto next = next_function<PFN_xrGetSystemProperties>(instance, "xrGetSystemProperties");
+  const XrResult result = next == nullptr ? XR_ERROR_HANDLE_INVALID
+                                          : next(instance, system_id, properties);
+  if (XR_SUCCEEDED(result) && properties != nullptr) {
+    for (auto* chain = static_cast<XrBaseOutStructure*>(properties->next); chain != nullptr;
+         chain = chain->next) {
+      if (chain->type == XR_TYPE_SYSTEM_HAND_TRACKING_PROPERTIES_EXT) {
+        auto* hand_properties = reinterpret_cast<XrSystemHandTrackingPropertiesEXT*>(chain);
+        hand_properties->supportsHandTracking = XR_TRUE;
+      }
+    }
+  }
+  return result;
+}
+
+XRAPI_ATTR XrResult XRAPI_CALL hook_create_hand_tracker(
+    XrSession session, const XrHandTrackerCreateInfoEXT* info, XrHandTrackerEXT* tracker) {
+  if (info == nullptr || tracker == nullptr ||
+      (info->hand != XR_HAND_LEFT_EXT && info->hand != XR_HAND_RIGHT_EXT) ||
+      info->handJointSet != XR_HAND_JOINT_SET_DEFAULT_EXT) {
+    return XR_ERROR_VALIDATION_FAILURE;
+  }
+  const XrInstance instance = instance_for_session(session);
+  if (instance == XR_NULL_HANDLE) return XR_ERROR_HANDLE_INVALID;
+  const auto handle = reinterpret_cast<XrHandTrackerEXT>(g_next_hand_tracker.fetch_add(1));
+  {
+    std::scoped_lock lock(g_mutex);
+    g_hand_trackers[handle] = HandTrackerData{
+        .instance = instance,
+        .session = session,
+        .side = info->hand == XR_HAND_RIGHT_EXT ? protocol::HandSide::Right
+                                                : protocol::HandSide::Left,
+    };
+  }
+  *tracker = handle;
+  return XR_SUCCESS;
+}
+
+XRAPI_ATTR XrResult XRAPI_CALL hook_destroy_hand_tracker(XrHandTrackerEXT tracker) {
+  std::scoped_lock lock(g_mutex);
+  return g_hand_trackers.erase(tracker) == 1 ? XR_SUCCESS : XR_ERROR_HANDLE_INVALID;
+}
+
+XRAPI_ATTR XrResult XRAPI_CALL hook_locate_hand_joints(
+    XrHandTrackerEXT tracker, const XrHandJointsLocateInfoEXT* info,
+    XrHandJointLocationsEXT* locations) {
+  if (info == nullptr || locations == nullptr || locations->jointLocations == nullptr ||
+      locations->jointCount < XR_HAND_JOINT_COUNT_EXT) {
+    return XR_ERROR_VALIDATION_FAILURE;
+  }
+  HandTrackerData tracker_data;
+  SpaceData base;
+  {
+    std::scoped_lock lock(g_mutex);
+    const auto found = g_hand_trackers.find(tracker);
+    if (found == g_hand_trackers.end()) return XR_ERROR_HANDLE_INVALID;
+    tracker_data = found->second;
+    const auto found_space = g_spaces.find(info->baseSpace);
+    if (found_space != g_spaces.end()) base = found_space->second;
+  }
+  const auto hands = transport_latest_hand_tracking();
+  const bool active = hands.has_value() &&
+      (tracker_data.side == protocol::HandSide::Right ? hands->right_active
+                                                       : hands->left_active);
+  locations->isActive = active ? XR_TRUE : XR_FALSE;
+  if (!active) return XR_SUCCESS;
+
+  const auto& joints = tracker_data.side == protocol::HandSide::Right
+                           ? hands->right_joints
+                           : hands->left_joints;
+  XrPosef inverse_base{.orientation = {.x = 0, .y = 0, .z = 0, .w = 1},
+                       .position = {.x = 0, .y = 0, .z = 0}};
+  if (const auto pose_input = transport_latest_pose_input(); pose_input.has_value()) {
+    inverse_base = inverse(local_pose(*pose_input, base));
+  }
+  for (std::size_t index = 0; index < protocol::kHandJointCount; ++index) {
+    locations->jointLocations[index] = XrHandJointLocationEXT{
+        .locationFlags = location_flags(joints[index].pose),
+        .pose = compose(inverse_base, xr_pose(joints[index].pose)),
+        .radius = joints[index].radius,
+    };
+  }
+  for (auto* chain = static_cast<XrBaseOutStructure*>(locations->next); chain != nullptr;
+       chain = chain->next) {
+    if (chain->type == XR_TYPE_HAND_JOINT_VELOCITIES_EXT) {
+      auto* velocities = reinterpret_cast<XrHandJointVelocitiesEXT*>(chain);
+      if (velocities->jointVelocities != nullptr &&
+          velocities->jointCount >= XR_HAND_JOINT_COUNT_EXT) {
+        for (std::size_t index = 0; index < protocol::kHandJointCount; ++index) {
+          velocities->jointVelocities[index] = XrHandJointVelocityEXT{
+              .velocityFlags = 0,
+              .linearVelocity = {},
+              .angularVelocity = {},
+          };
+        }
+      }
+    }
+  }
+  return XR_SUCCESS;
+}
+
 }  // namespace
 
 void input_register_instance(XrInstance instance, PFN_xrGetInstanceProcAddr gipa) {
@@ -684,6 +869,10 @@ void input_unregister_instance(XrInstance instance) {
   for (auto session = g_sessions.begin(); session != g_sessions.end();) {
     session = session->second == instance ? g_sessions.erase(session) : std::next(session);
   }
+  for (auto tracker = g_hand_trackers.begin(); tracker != g_hand_trackers.end();) {
+    tracker = tracker->second.instance == instance ? g_hand_trackers.erase(tracker)
+                                                   : std::next(tracker);
+  }
   g_instances.erase(instance);
 }
 
@@ -698,6 +887,9 @@ void input_unregister_session(XrSession session) {
     space = space->second.session == session ? g_spaces.erase(space) : std::next(space);
   }
   g_sessions.erase(session);
+  std::erase_if(g_hand_trackers, [session](const auto& item) {
+    return item.second.session == session;
+  });
   std::erase_if(g_boolean_states, [session](const auto& item) {
     return std::get<0>(item.first) == session;
   });
@@ -727,6 +919,12 @@ bool input_get_proc_addr(const char* name, PFN_xrVoidFunction* function) {
       {"xrGetActionStateFloat", reinterpret_cast<PFN_xrVoidFunction>(hook_get_float)},
       {"xrGetActionStateVector2f", reinterpret_cast<PFN_xrVoidFunction>(hook_get_vector2)},
       {"xrGetActionStatePose", reinterpret_cast<PFN_xrVoidFunction>(hook_get_pose)},
+      {"xrApplyHapticFeedback", reinterpret_cast<PFN_xrVoidFunction>(hook_apply_haptic)},
+      {"xrStopHapticFeedback", reinterpret_cast<PFN_xrVoidFunction>(hook_stop_haptic)},
+      {"xrGetSystemProperties", reinterpret_cast<PFN_xrVoidFunction>(hook_get_system_properties)},
+      {"xrCreateHandTrackerEXT", reinterpret_cast<PFN_xrVoidFunction>(hook_create_hand_tracker)},
+      {"xrDestroyHandTrackerEXT", reinterpret_cast<PFN_xrVoidFunction>(hook_destroy_hand_tracker)},
+      {"xrLocateHandJointsEXT", reinterpret_cast<PFN_xrVoidFunction>(hook_locate_hand_joints)},
   };
   for (const auto& entry : entries) {
     if (std::strcmp(name, entry.name) == 0) {

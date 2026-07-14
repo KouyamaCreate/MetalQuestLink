@@ -108,6 +108,16 @@ class TransportServer {
     return latest_pose_input_;
   }
 
+  [[nodiscard]] std::optional<protocol::HandTrackingInput> latest_hand_tracking() const {
+    std::scoped_lock lock(hand_mutex_);
+    if (latest_hand_tracking_.has_value() &&
+        std::chrono::steady_clock::now() - latest_hand_received_at_ >
+            std::chrono::milliseconds(500)) {
+      return std::nullopt;
+    }
+    return latest_hand_tracking_;
+  }
+
  private:
   [[nodiscard]] std::shared_ptr<Connection> current_connection() const {
     std::scoped_lock lock(connection_mutex_);
@@ -150,6 +160,11 @@ class TransportServer {
           std::scoped_lock lock(pose_mutex_);
           latest_pose_input_ = *pose;
           latest_pose_received_at_ = std::chrono::steady_clock::now();
+        } else if (auto* hands = std::get_if<protocol::HandTrackingInput>(&message.payload);
+                   hands != nullptr) {
+          std::scoped_lock lock(hand_mutex_);
+          latest_hand_tracking_ = *hands;
+          latest_hand_received_at_ = std::chrono::steady_clock::now();
         } else if (auto* control = std::get_if<protocol::ControlMessage>(&message.payload);
                    control != nullptr && control->kind == protocol::ControlKind::Ping) {
           std::vector<std::byte> echoed_timestamp(sizeof(control->timestamp_ns));
@@ -220,16 +235,18 @@ class TransportServer {
       (void)::setsockopt(accepted, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
       auto connection = std::make_shared<Connection>(accepted);
       {
-        std::scoped_lock lock(connection_mutex_, pose_mutex_);
+        std::scoped_lock lock(connection_mutex_, pose_mutex_, hand_mutex_);
         connection_ = connection;
         latest_pose_input_.reset();
+        latest_hand_tracking_.reset();
       }
       receive_loop(stop, connection);
       {
-        std::scoped_lock lock(connection_mutex_, pose_mutex_);
+        std::scoped_lock lock(connection_mutex_, pose_mutex_, hand_mutex_);
         if (connection_ == connection) {
           connection_.reset();
           latest_pose_input_.reset();
+          latest_hand_tracking_.reset();
         }
       }
     }
@@ -266,9 +283,10 @@ class TransportServer {
     }
     lock.lock();
     {
-      std::scoped_lock state_lock(connection_mutex_, pose_mutex_);
+      std::scoped_lock state_lock(connection_mutex_, pose_mutex_, hand_mutex_);
       connection_.reset();
       latest_pose_input_.reset();
+      latest_hand_tracking_.reset();
     }
   }
 
@@ -281,6 +299,9 @@ class TransportServer {
   mutable std::mutex pose_mutex_;
   std::optional<protocol::PoseInput> latest_pose_input_;
   std::chrono::steady_clock::time_point latest_pose_received_at_{};
+  mutable std::mutex hand_mutex_;
+  std::optional<protocol::HandTrackingInput> latest_hand_tracking_;
+  std::chrono::steady_clock::time_point latest_hand_received_at_{};
 };
 
 }  // namespace
@@ -293,4 +314,7 @@ void transport_send(const maquestlink::protocol::Message& message) {
 }
 std::optional<maquestlink::protocol::PoseInput> transport_latest_pose_input() {
   return TransportServer::instance().latest_pose_input();
+}
+std::optional<maquestlink::protocol::HandTrackingInput> transport_latest_hand_tracking() {
+  return TransportServer::instance().latest_hand_tracking();
 }

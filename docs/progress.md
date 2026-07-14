@@ -12,7 +12,7 @@
 | 5 — Unityエディタ統合 | 完了 | EditMode 1/1、Meta XR Simulator PlayMode 1/1、layer load・接続待ち確認 |
 | 6 — 再投影・計測・ドキュメント | 完了 | world pose / clock unit 3/3、clock sync E2E、Phase 0〜5回帰成功 |
 | 7 — 配布パッケージング | 完了 | 配布4点・checksum・repository外tarball Unity/Simulator E2E・doctor成功 |
-| 8 — Quest機能の拡張対応 | 未着手 | — |
+| 8 — Quest機能の拡張対応 | 完了（実機確認のみ保留） | haptic / hand / passthrough mock E2E、Quest EditMode 9/9、APK・release再生成、Phase 0〜7回帰成功 |
 
 ## Phase 0
 
@@ -177,3 +177,28 @@
   - 配布packageのlayer load、`waiting_for_connection`、doctor error 0を確認した。
 - Quest device E2E:
   - Quest未接続。配布APKをinstall後に`scripts/e2e_device.sh`を実行し、無装着stream / input / world-fixed / clock syncを検証する。
+
+## Phase 8
+
+- 成果物:
+  - `xrApplyHapticFeedback` / `xrStopHapticFeedback`からQuest Touchへ左右別に伝えるHapticCommand
+  - implicit manifestとlayer hookで提供する`XR_EXT_hand_tracking`、左右26関節のHandTrackingInput
+  - Unity XR HandsのAndroid Hand Tracking SubsystemとMeta hand project capability
+  - alpha/additive/source-alpha検出、Quest Passthrough underlay、固定uniform alpha 0.82の近似合成
+  - Phase 8条件を追加したmock / native / Quest EditMode / device E2Eと全回帰script
+- native / protocol / E2E:
+  - `cmake --build build --parallel && ctest --test-dir build --output-on-failure`: 成功、protocol 1/1。
+  - `scripts/test_phase3.sh`: 成功。120/120 H.264 decode、合成pose/action、左右26関節、haptic apply/stop、clock sync、Passthrough flagとalpha 0.82を同じTCP接続で確認。
+  - native testは`hands=1 haptics=1`、mockは`haptic_apply=1 haptic_stop=1 passthrough=1 passthrough_alpha=0.82`。
+- Quest client:
+  - `scripts/test_quest_client.sh`: 成功、EditMode 9/9。HapticCommand / HandTrackingInput wire round-trip、joint mapping、frequency / alpha semanticを確認。
+  - `scripts/build_quest_client.sh`: 成功、IL2CPP / ARM64 APK 42 MiB。
+  - Android OpenXR assetでMicrosoft Hand Interaction Profileは無効、XR Hands Hand Tracking Subsystemは有効であることを確認。
+- release / regression:
+  - Phase 8 sourceを含むnative layer、APK、UPM tarball、checksum、VERSIONを再生成した。
+  - APK SHA-256 `51798579417bc867e1cd9c0b42c6299f5d6d498ba232feceaeae3803ad02f3ff`、UPM SHA-256 `981ce424f1604731512f88f332db63c1a2916ca8ff6a51cbcdca11a73a095a30`。
+  - `scripts/test_phase8.sh`: 成功。Phase 0〜7の全検証、release checksum、doctor error 0、repository外tarball Unity/Simulator E2Eが成功。
+  - 最終出力は`Phase 0-8 regression passed (device result: 2)`。device result 2はQuest未接続の保留を表す。
+- Quest device E2E:
+  - Quest未接続のため、MediaCodec表示、実joint 60 Hz、Touch振動、Passthrough underlayの実機結果は保留。
+  - 接続後に`scripts/e2e_device.sh`を実行する。未接続時はexit 2で、他のPhase 8完了条件とは分離する。

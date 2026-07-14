@@ -10,6 +10,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -141,6 +142,34 @@ void send_synthetic_input(std::stop_token stop, int socket_fd,
       if (sent <= 0) {
         return;
       }
+      offset += static_cast<std::size_t>(sent);
+    }
+    protocol::HandTrackingInput hands{
+        .sample_timestamp_ns = monotonic_now_ns(),
+        .left_active = true,
+        .right_active = true,
+    };
+    for (std::size_t index = 0; index < protocol::kHandJointCount; ++index) {
+      hands.left_joints[index] = {
+          .pose = synthetic_pose(-0.25F + static_cast<float>(index) * 0.001F,
+                                 1.1F + static_cast<float>(index) * 0.002F, -0.4F),
+          .radius = 0.008F,
+      };
+      hands.right_joints[index] = {
+          .pose = synthetic_pose(0.25F + static_cast<float>(index) * 0.001F,
+                                 1.1F + static_cast<float>(index) * 0.002F, -0.4F),
+          .radius = 0.008F,
+      };
+    }
+    const auto hand_bytes = protocol::serialize(protocol::Message{
+        .sequence = sequence,
+        .payload = std::move(hands),
+    });
+    offset = 0;
+    while (offset < hand_bytes.size() && !stop.stop_requested()) {
+      const ssize_t sent =
+          ::send(socket_fd, hand_bytes.data() + offset, hand_bytes.size() - offset, 0);
+      if (sent <= 0) return;
       offset += static_cast<std::size_t>(sent);
     }
     sent_count.fetch_add(1);
@@ -355,7 +384,11 @@ int run(int argc, char** argv) {
   std::uint32_t width{};
   std::uint32_t height{};
   bool clock_sync{};
-  while (stats.decoded.load() < static_cast<std::uint64_t>(options.frames)) {
+  bool haptic_apply{};
+  bool haptic_stop{};
+  bool passthrough{};
+  while (stats.decoded.load() < static_cast<std::uint64_t>(options.frames) ||
+         (options.send_input && (!haptic_apply || !haptic_stop))) {
     const protocol::Message message = receive_message(socket_fd);
     if (const auto* control = std::get_if<protocol::ControlMessage>(&message.payload);
         control != nullptr && control->kind == protocol::ControlKind::Pong) {
@@ -363,6 +396,22 @@ int run(int argc, char** argv) {
         throw std::runtime_error("invalid clock synchronization Pong");
       }
       clock_sync = true;
+      continue;
+    }
+    if (const auto* haptic = std::get_if<protocol::HapticCommand>(&message.payload);
+        haptic != nullptr) {
+      if (haptic->side != protocol::HandSide::Left) {
+        throw std::runtime_error("unexpected haptic hand side");
+      }
+      if (haptic->action == protocol::HapticAction::Apply) {
+        if (std::abs(haptic->amplitude - 0.6F) > 0.001F ||
+            haptic->duration_ns != 20'000'000ULL) {
+          throw std::runtime_error("unexpected haptic amplitude or duration");
+        }
+        haptic_apply = true;
+      } else {
+        haptic_stop = true;
+      }
       continue;
     }
     const auto* frame = std::get_if<protocol::VideoFrame>(&message.payload);
@@ -375,6 +424,7 @@ int run(int argc, char** argv) {
         (frame->render_views[1].pose.flags & protocol::OrientationValid) == 0) {
       throw std::runtime_error("invalid video frame metadata or codec");
     }
+    passthrough = passthrough || (frame->flags & protocol::Passthrough) != 0;
     if (received == 0) {
       width = frame->width;
       height = frame->height;
@@ -395,10 +445,17 @@ int run(int argc, char** argv) {
     if (!clock_sync) {
       throw std::runtime_error("layer did not reply to clock synchronization Ping");
     }
+    if (!passthrough) {
+      throw std::runtime_error("layer did not mark passthrough projection frames");
+    }
   }
   std::cout << "MAQUESTLINK_VIDEO_E2E_OK received=" << received << " decoded=" << decoded
             << " fps=" << fps << " width=" << width << " height=" << height
-            << " input_sent=" << sent_input.load() << " clock_sync=" << clock_sync << '\n';
+            << " input_sent=" << sent_input.load() << " clock_sync=" << clock_sync
+            << " haptic_apply=" << haptic_apply << " haptic_stop=" << haptic_stop
+            << " passthrough=" << passthrough
+            << " passthrough_alpha="
+            << (passthrough ? protocol::kPassthroughApproximationAlpha : 1.0F) << '\n';
   if (fps < options.minimum_fps) {
     throw std::runtime_error("decoded frame rate is below the required minimum");
   }

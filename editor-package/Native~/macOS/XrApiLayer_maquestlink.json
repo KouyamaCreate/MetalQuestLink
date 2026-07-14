@@ -6,6 +6,12 @@
     "api_version": "1.0",
     "implementation_version": "1",
     "description": "MaQuestLink OpenXR streaming layer",
+    "instance_extensions": [
+      {
+        "name": "XR_EXT_hand_tracking",
+        "extension_version": "4"
+      }
+    ],
     "enable_environment": "MAQUESTLINK_ENABLE_API_LAYER",
     "disable_environment": "MAQUESTLINK_DISABLE_API_LAYER"
   }

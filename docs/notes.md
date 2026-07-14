@@ -180,3 +180,33 @@
 - Simulator停止とQuest未接続は利用準備を妨げないため警告。Quest接続時は端末上の`com.maquestlink.questclient` versionもpackage versionと比較する。
 - `scripts/test_phase7_clean.sh`はtarballだけを参照するrepository外の一時Unity sampleを作り、EditMode / Meta XR Simulator PlayMode、layer load、接続待ち、doctor error 0を確認して成功した。
 - 初回実行では過去の並行batchmode実行が残したorphanのUnity Licensing ClientによりIPC再接続が停止した。stale processだけを終了し、license cacheは変更せず再実行して成功した。
+
+## 2026-07-15 — Phase 8 実測
+
+### ハプティクス
+
+- Meta Touch bindingの`/output/haptic`へ紐づくaction/subactionを既存binding追跡から特定できた。OpenXR runtime呼び出しが成功した場合だけHapticCommandを送る。
+- native testがleft controllerへamplitude 0.6、frequency 120 Hz、duration 20 msをapplyしてstopし、mock clientが値と順序を検証した。
+- Quest側は`OVRInput.SetControllerVibration`を使う。frequencyはQuest APIの0〜1へ0〜320 Hz基準で正規化し、duration満了もclient側で停止する。実機の振動強度／周波数感は未実測。
+
+### ハンドトラッキング
+
+- Unity XR Hands 1.7.2のOpenXR providerは`XR_EXT_hand_tracking`で26関節を取得する。Meta XR Core 203.0.0のproject capabilityをControllersAndHands / HIGHに設定した。
+- Unity OpenXRのMicrosoft Hand Interaction ProfileとXR Hands Hand Tracking Subsystemは同じfeature ID `com.unity.openxr.feature.input.handtracking`を持つ。ID検索では前者を誤選択したため、build設定は`UnityEngine.XR.Hands.OpenXR.HandTracking`型で後者を選ぶ。生成したAndroid assetで前者0、後者1を確認した。
+- XR Hands joint IDはPalm / WristだけOpenXR順とUnity enum値が逆で、それ以降はOpenXR index + 1。unit testでPalm 0→2、Wrist 1→1、index 10→11を固定した。
+- layer manifestの`instance_extensions`で`XR_EXT_hand_tracking`をloader列挙へ追加し、system support、create/locate/destroyをhookする。mock 26関節がnative testの`xrLocateHandJointsEXT`へ反映され、`hands=1`を確認した。
+- 基本joint取得に`XR_FB_hand_tracking_aim`などのMeta追加拡張は不要。Meta aim gestureやmeshは提供していないため、それらを要求するアプリはMaQuestLink経由では利用できない。
+
+### パススルー近似
+
+- Mac layerはenvironment blend modeがalpha/additive、またはprojection layerがsource-alpha flagを持つ場合にPassthrough flagを送る。
+- VideoToolbox H.264 / Quest MediaCodec経路は画素alphaを保持しない。実機なしではHEVC alpha support、premultiplied挙動、black key品質を実測できないため、protocol v1はunderlay + overlay全体の固定alpha 0.82を採用した。
+- mock E2EでPassthrough flagを復元し、protocol semanticのalpha 0.82を出力して検証した。Quest EditModeも同じalpha定数を検証する。
+- 実機でunderlayが表示されること、External Surface overlayのcolor scaleが意図どおり合成されること、視認性は未実測。
+
+### Phase 8検証
+
+- `scripts/test_phase3.sh`: 3360x1760 H.264 received / decoded 120/120、76.5903 fps、PoseInput 173 samples、clock sync、hand joints、haptic apply/stop、passthrough近似が成功。
+- Quest EditMode 9/9、Unity 6000.3.6f1 IL2CPP / ARM64 APK buildが成功。Phase 8 release APKのSHA-256は`51798579417bc867e1cd9c0b42c6299f5d6d498ba232feceaeae3803ad02f3ff`。
+- 最終`test_phase8.sh`はPhase 0〜7回帰、release checksum、doctor error 0、repository外tarball Unity/Simulator E2Eまで成功。Phase 3最終runは120/120、76.6143 fps、input 163 samples。
+- Quest未接続のためdevice E2Eはexit 2を期待値として扱い、実機が必要な4項目は最終レポートへ分離する。

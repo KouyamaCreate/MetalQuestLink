@@ -52,6 +52,12 @@ namespace MaQuestLink.Editor
                        "    \"api_version\": \"1.0\",\n" +
                        "    \"implementation_version\": \"1\",\n" +
                        "    \"description\": \"MaQuestLink OpenXR streaming layer\",\n" +
+                       "    \"instance_extensions\": [\n" +
+                       "      {\n" +
+                       "        \"name\": \"XR_EXT_hand_tracking\",\n" +
+                       "        \"extension_version\": \"4\"\n" +
+                       "      }\n" +
+                       "    ],\n" +
                        "    \"enable_environment\": \"MAQUESTLINK_ENABLE_API_LAYER\",\n" +
                        "    \"disable_environment\": \"MAQUESTLINK_DISABLE_API_LAYER\"\n" +
                        "  }\n" +

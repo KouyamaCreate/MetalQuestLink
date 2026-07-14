@@ -9,12 +9,34 @@ namespace MaQuestLink.QuestClient
         VideoFrame = 1,
         PoseInput = 2,
         Control = 3,
+        HapticCommand = 4,
+        HandTrackingInput = 5,
     }
 
     public enum VideoCodec : byte
     {
         H264 = 1,
         Hevc = 2,
+    }
+
+    [Flags]
+    public enum VideoFrameFlags : ushort
+    {
+        KeyFrame = 1 << 0,
+        Passthrough = 1 << 1,
+        ChromaKeyTransparency = 1 << 2,
+    }
+
+    public enum HandSide : byte
+    {
+        Left = 1,
+        Right = 2,
+    }
+
+    public enum HapticAction : byte
+    {
+        Apply = 1,
+        Stop = 2,
     }
 
     public enum ControlKind : ushort
@@ -131,6 +153,32 @@ namespace MaQuestLink.QuestClient
         public byte[] Data = Array.Empty<byte>();
     }
 
+    public sealed class HapticCommand
+    {
+        public ulong TimestampNs;
+        public HandSide Side;
+        public HapticAction Action;
+        public ushort Reserved;
+        public float Amplitude;
+        public float FrequencyHz;
+        public ulong DurationNs;
+    }
+
+    public struct HandJointState
+    {
+        public PoseState Pose;
+        public float Radius;
+    }
+
+    public sealed class HandTrackingInput
+    {
+        public ulong SampleTimestampNs;
+        public bool LeftActive;
+        public bool RightActive;
+        public HandJointState[] LeftJoints = new HandJointState[Protocol.HandJointCount];
+        public HandJointState[] RightJoints = new HandJointState[Protocol.HandJointCount];
+    }
+
     public sealed class WireMessage
     {
         public ulong Sequence;
@@ -162,7 +210,9 @@ namespace MaQuestLink.QuestClient
         public const uint Magic = 0x4b4c514d;
         public const ushort Version = 1;
         public const int HeaderSize = 20;
+        public const float PassthroughApproximationAlpha = 0.82f;
         public const uint MaxPayloadSize = 64u * 1024u * 1024u;
+        public const int HandJointCount = 26;
 
         public static MessageHeader ParseHeader(byte[] bytes)
         {
@@ -193,7 +243,8 @@ namespace MaQuestLink.QuestClient
                 throw new ProtocolException("declared payload exceeds the protocol limit");
             }
             if (header.Type != MessageType.VideoFrame && header.Type != MessageType.PoseInput &&
-                header.Type != MessageType.Control)
+                header.Type != MessageType.Control && header.Type != MessageType.HapticCommand &&
+                header.Type != MessageType.HandTrackingInput)
             {
                 throw new ProtocolException("unknown message type");
             }
@@ -223,6 +274,16 @@ namespace MaQuestLink.QuestClient
             {
                 type = MessageType.Control;
                 payload = SerializeControl(control);
+            }
+            else if (message.Payload is HapticCommand haptic)
+            {
+                type = MessageType.HapticCommand;
+                payload = SerializeHaptic(haptic);
+            }
+            else if (message.Payload is HandTrackingInput hands)
+            {
+                type = MessageType.HandTrackingInput;
+                payload = SerializeHands(hands);
             }
             else
             {
@@ -267,6 +328,12 @@ namespace MaQuestLink.QuestClient
                     break;
                 case MessageType.Control:
                     payload = DeserializeControl(reader);
+                    break;
+                case MessageType.HapticCommand:
+                    payload = DeserializeHaptic(reader);
+                    break;
+                case MessageType.HandTrackingInput:
+                    payload = DeserializeHands(reader);
                     break;
                 default:
                     throw new ProtocolException("unknown message type");
@@ -318,6 +385,36 @@ namespace MaQuestLink.QuestClient
             return writer.ToArray();
         }
 
+        private static byte[] SerializeHaptic(HapticCommand value)
+        {
+            var writer = new WireWriter(28);
+            writer.Write(value.TimestampNs);
+            writer.Write((byte)value.Side);
+            writer.Write((byte)value.Action);
+            writer.Write(value.Reserved);
+            writer.Write(value.Amplitude);
+            writer.Write(value.FrequencyHz);
+            writer.Write(value.DurationNs);
+            return writer.ToArray();
+        }
+
+        private static byte[] SerializeHands(HandTrackingInput value)
+        {
+            if (value.LeftJoints == null || value.LeftJoints.Length != HandJointCount ||
+                value.RightJoints == null || value.RightJoints.Length != HandJointCount)
+            {
+                throw new ProtocolException("hand tracking must contain 26 joints per hand");
+            }
+            var writer = new WireWriter(12 + HandJointCount * 2 * 36);
+            writer.Write(value.SampleTimestampNs);
+            writer.Write((byte)(value.LeftActive ? 1 : 0));
+            writer.Write((byte)(value.RightActive ? 1 : 0));
+            writer.Write((ushort)HandJointCount);
+            foreach (var joint in value.LeftJoints) WriteHandJoint(writer, joint);
+            foreach (var joint in value.RightJoints) WriteHandJoint(writer, joint);
+            return writer.ToArray();
+        }
+
         private static VideoFrame DeserializeVideo(WireReader reader)
         {
             var value = new VideoFrame { CaptureTimestampNs = reader.ReadUInt64() };
@@ -355,6 +452,43 @@ namespace MaQuestLink.QuestClient
             return value;
         }
 
+        private static HapticCommand DeserializeHaptic(WireReader reader)
+        {
+            var value = new HapticCommand
+            {
+                TimestampNs = reader.ReadUInt64(),
+                Side = (HandSide)reader.ReadByte(),
+                Action = (HapticAction)reader.ReadByte(),
+                Reserved = reader.ReadUInt16(),
+                Amplitude = reader.ReadSingle(),
+                FrequencyHz = reader.ReadSingle(),
+                DurationNs = reader.ReadUInt64(),
+            };
+            if ((value.Side != HandSide.Left && value.Side != HandSide.Right) ||
+                (value.Action != HapticAction.Apply && value.Action != HapticAction.Stop))
+            {
+                throw new ProtocolException("invalid haptic command enum value");
+            }
+            return value;
+        }
+
+        private static HandTrackingInput DeserializeHands(WireReader reader)
+        {
+            var value = new HandTrackingInput
+            {
+                SampleTimestampNs = reader.ReadUInt64(),
+                LeftActive = reader.ReadByte() != 0,
+                RightActive = reader.ReadByte() != 0,
+            };
+            if (reader.ReadUInt16() != HandJointCount)
+            {
+                throw new ProtocolException("hand tracking joint count is not 26");
+            }
+            for (var index = 0; index < HandJointCount; index++) value.LeftJoints[index] = ReadHandJoint(reader);
+            for (var index = 0; index < HandJointCount; index++) value.RightJoints[index] = ReadHandJoint(reader);
+            return value;
+        }
+
         private static void WritePose(WireWriter writer, PoseState value)
         {
             writer.Write(value.Position.X);
@@ -378,6 +512,17 @@ namespace MaQuestLink.QuestClient
                 },
                 Flags = (PoseFlags)reader.ReadUInt32(),
             };
+        }
+
+        private static void WriteHandJoint(WireWriter writer, HandJointState value)
+        {
+            WritePose(writer, value.Pose);
+            writer.Write(value.Radius);
+        }
+
+        private static HandJointState ReadHandJoint(WireReader reader)
+        {
+            return new HandJointState { Pose = ReadPose(reader), Radius = reader.ReadSingle() };
         }
 
         private static void WriteController(WireWriter writer, ControllerState value)

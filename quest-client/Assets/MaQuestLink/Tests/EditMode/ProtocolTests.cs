@@ -73,6 +73,46 @@ namespace MaQuestLink.QuestClient.Tests
         }
 
         [Test]
+        public void HapticAndHandTracking_RoundTrip()
+        {
+            var haptic = new HapticCommand
+            {
+                TimestampNs = 10,
+                Side = HandSide.Left,
+                Action = HapticAction.Apply,
+                Amplitude = 0.6f,
+                FrequencyHz = 120.0f,
+                DurationNs = 20_000_000,
+            };
+            var decodedHaptic = (HapticCommand)Protocol.Deserialize(
+                Protocol.Serialize(new WireMessage(10, haptic))).Payload;
+            Assert.That(decodedHaptic.Side, Is.EqualTo(HandSide.Left));
+            Assert.That(decodedHaptic.Amplitude, Is.EqualTo(0.6f));
+            Assert.That(decodedHaptic.DurationNs, Is.EqualTo(20_000_000ul));
+
+            var hands = CreateHands();
+            var bytes = Protocol.Serialize(new WireMessage(11, hands));
+            Assert.That(bytes.Length, Is.EqualTo(Protocol.HeaderSize + 1884));
+            var decodedHands = (HandTrackingInput)Protocol.Deserialize(bytes).Payload;
+            Assert.IsTrue(decodedHands.LeftActive);
+            Assert.That(decodedHands.LeftJoints.Length, Is.EqualTo(26));
+            Assert.That(decodedHands.LeftJoints[10].Pose.Position.X, Is.EqualTo(-0.24f));
+            Assert.That(decodedHands.RightJoints[25].Radius, Is.EqualTo(0.009f));
+        }
+
+        [Test]
+        public void QuestFeatureMappings_AreStable()
+        {
+            Assert.That(QuestHaptics.NormalizeFrequency(0), Is.EqualTo(1.0f));
+            Assert.That(QuestHaptics.NormalizeFrequency(160), Is.EqualTo(0.5f));
+            Assert.That(QuestHaptics.NormalizeFrequency(640), Is.EqualTo(1.0f));
+            Assert.That(Protocol.PassthroughApproximationAlpha, Is.EqualTo(0.82f));
+            Assert.That(QuestHandSampler.UnityJointIdForOpenXrIndex(0), Is.EqualTo(2));
+            Assert.That(QuestHandSampler.UnityJointIdForOpenXrIndex(1), Is.EqualTo(1));
+            Assert.That(QuestHandSampler.UnityJointIdForOpenXrIndex(10), Is.EqualTo(11));
+        }
+
+        [Test]
         public void InvalidMessagesAreRejected()
         {
             var valid = Protocol.Serialize(new WireMessage(1, CreatePoseInput()));
@@ -102,7 +142,14 @@ namespace MaQuestLink.QuestClient.Tests
                     };
                     var videoBytes = Protocol.Serialize(new WireMessage(2, video));
                     await stream.WriteAsync(videoBytes, 0, videoBytes.Length);
+                    var hapticBytes = Protocol.Serialize(new WireMessage(3, new HapticCommand
+                    {
+                        Side = HandSide.Right,
+                        Action = HapticAction.Stop,
+                    }));
+                    await stream.WriteAsync(hapticBytes, 0, hapticBytes.Length);
 
+                    transport.SubmitLatestHands(CreateHands());
                     transport.SubmitLatestPose(CreatePoseInput());
                     MessageHeader header;
                     while (true)
@@ -137,6 +184,10 @@ namespace MaQuestLink.QuestClient.Tests
                     Assert.That(received.Width, Is.EqualTo(100));
                     Assert.That(transport.ReceivedFrames, Is.EqualTo(1));
                     Assert.That(transport.SentPoses, Is.EqualTo(1));
+                    await WaitUntil(() => transport.SentHands >= 1, 3000);
+                    HapticCommand receivedHaptic = null;
+                    await WaitUntil(() => transport.TryDequeueHaptic(out receivedHaptic), 3000);
+                    Assert.That(receivedHaptic.Side, Is.EqualTo(HandSide.Right));
                     await WaitUntil(() => transport.HasClockSync, 3000);
                     Assert.That(transport.ClockRoundTripMs, Is.GreaterThanOrEqualTo(0));
                 }
@@ -207,6 +258,30 @@ namespace MaQuestLink.QuestClient.Tests
                     Grip = 0.875f,
                 },
             };
+        }
+
+        private static HandTrackingInput CreateHands()
+        {
+            var hands = new HandTrackingInput
+            {
+                SampleTimestampNs = 987654321,
+                LeftActive = true,
+                RightActive = true,
+            };
+            for (var index = 0; index < Protocol.HandJointCount; index++)
+            {
+                hands.LeftJoints[index] = new HandJointState
+                {
+                    Pose = ValidPose(-0.25f + index * 0.001f, 1.1f + index * 0.002f, -0.4f),
+                    Radius = 0.008f,
+                };
+                hands.RightJoints[index] = new HandJointState
+                {
+                    Pose = ValidPose(0.25f + index * 0.001f, 1.1f + index * 0.002f, -0.4f),
+                    Radius = 0.009f,
+                };
+            }
+            return hands;
         }
 
         private static PoseState ValidPose(float x, float y, float z)

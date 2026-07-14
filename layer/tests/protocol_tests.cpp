@@ -111,6 +111,36 @@ void test_control_round_trip() {
          "control round trip");
 }
 
+void test_haptic_and_hands_round_trip() {
+  const protocol::Message haptic{
+      .sequence = 8,
+      .payload = protocol::HapticCommand{
+          .timestamp_ns = 123,
+          .side = protocol::HandSide::Right,
+          .action = protocol::HapticAction::Apply,
+          .amplitude = 0.75F,
+          .frequency_hz = 160.0F,
+          .duration_ns = 25'000'000,
+      },
+  };
+  expect(protocol::deserialize(protocol::serialize(haptic)) == haptic,
+         "haptic round trip");
+
+  protocol::HandTrackingInput hands{
+      .sample_timestamp_ns = 456,
+      .left_active = true,
+      .right_active = true,
+  };
+  for (std::size_t index = 0; index < protocol::kHandJointCount; ++index) {
+    hands.left_joints[index] = {.pose = pose(static_cast<float>(index)), .radius = 0.008F};
+    hands.right_joints[index] = {
+        .pose = pose(static_cast<float>(index) + 100.0F), .radius = 0.009F};
+  }
+  const protocol::Message hand_message{.sequence = 9, .payload = hands};
+  expect(protocol::deserialize(protocol::serialize(hand_message)) == hand_message,
+         "26-joint hand tracking round trip");
+}
+
 void test_wire_is_little_endian() {
   const protocol::Message message{
       .sequence = 0x0102030405060708ULL,
@@ -171,6 +201,7 @@ int main() {
   test_video_round_trip();
   test_pose_input_round_trip();
   test_control_round_trip();
+  test_haptic_and_hands_round_trip();
   test_wire_is_little_endian();
   test_rejects_invalid_messages();
   if (failures == 0) {
