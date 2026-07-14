@@ -28,9 +28,13 @@ fi
 VIEWER_PID="$!"
 
 echo "Checking synthetic OpenXR pose and action injection..."
-MAQUESTLINK_PORT="${PORT}" MAQUESTLINK_VERIFY_INPUT=1 \
-MAQUESTLINK_TEST_FRAMES=240 \
-  "${ROOT_DIR}/scripts/test_phase1.sh" 2>&1 | tee "${PRODUCER_LOG}"
+if ! MAQUESTLINK_PORT="${PORT}" MAQUESTLINK_VERIFY_INPUT=1 \
+  MAQUESTLINK_TEST_FRAMES=240 \
+    "${ROOT_DIR}/scripts/test_phase1.sh" >"${PRODUCER_LOG}" 2>&1; then
+  cat "${PRODUCER_LOG}"
+  exit 1
+fi
+cat "${PRODUCER_LOG}"
 wait "${VIEWER_PID}"
 VIEWER_PID=""
 

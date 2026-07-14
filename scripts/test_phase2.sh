@@ -26,15 +26,23 @@ if [[ ! -x "${VIEWER}" ]]; then
 fi
 
 echo "Checking disconnected pass-through..."
-MAQUESTLINK_PORT="${PORT}" MAQUESTLINK_TEST_FRAMES=60 \
-  "${ROOT_DIR}/scripts/test_phase1.sh" 2>&1 | tee "${PASSTHROUGH_LOG}"
+if ! MAQUESTLINK_PORT="${PORT}" MAQUESTLINK_TEST_FRAMES=60 \
+  "${ROOT_DIR}/scripts/test_phase1.sh" >"${PASSTHROUGH_LOG}" 2>&1; then
+  cat "${PASSTHROUGH_LOG}"
+  exit 1
+fi
+cat "${PASSTHROUGH_LOG}"
 
 "${VIEWER}" --port "${PORT}" --frames 120 --min-fps 30 >"${VIEWER_LOG}" 2>&1 &
 VIEWER_PID="$!"
 
 echo "Checking connected H.264 loopback stream..."
-MAQUESTLINK_PORT="${PORT}" MAQUESTLINK_TEST_FRAMES=240 \
-  "${ROOT_DIR}/scripts/test_phase1.sh" 2>&1 | tee "${PRODUCER_LOG}"
+if ! MAQUESTLINK_PORT="${PORT}" MAQUESTLINK_TEST_FRAMES=240 \
+  "${ROOT_DIR}/scripts/test_phase1.sh" >"${PRODUCER_LOG}" 2>&1; then
+  cat "${PRODUCER_LOG}"
+  exit 1
+fi
+cat "${PRODUCER_LOG}"
 wait "${VIEWER_PID}"
 VIEWER_PID=""
 

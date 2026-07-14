@@ -35,14 +35,14 @@
 
 ### pose・入力注入
 
-- transportは単一TCP connectionを全二重で使い、Mac→clientのVideoFrameとclient→MacのPoseInputを同時に処理する。OpenXR instance破棄時にlistenerを停止・joinし、layer unload後にthreadを残さない。
+- transportは単一TCP connectionを全二重で使い、Mac→clientのVideoFrameとclient→MacのPoseInputを同時に処理する。OpenXR instance破棄時にlistenerを停止・joinし、layer unload後にthreadを残さない。listener / accepted socketにはclose-on-execを設定し、layer processが起動したadbなどの子孫processへsocketを継承させない。
 - 最後に受信したPoseInputを各hookが参照する。接続切断時、またはローカル受信から500 ms経過したstale入力ではruntime結果を変更しない。
 - `xrLocateViews` はHMD poseを中心として左右±32 mmのeye poseを返す。`xrLocateSpace` はVIEW reference spaceと左右action spaceを追跡し、base spaceからの相対poseへ変換する。
 - `xrCreateActionSet` / `xrCreateAction` / `xrSuggestInteractionProfileBindings` を追跡し、actionと左右subaction path、binding componentを対応づける。
 - `xrSyncActions` はruntimeへ転送し、`xrGetActionStateBoolean` / `Float` / `Vector2f` / `Pose` の成功結果を受信入力で差し替える。click/touch、trigger、squeeze、thumbstick、grip/aim poseを扱う。
 - `changedSinceLastSync` はsession/action/subactionごとに前回返却値と比較する。入力中断時はruntime stateへ戻る。
 - `maquestlink_mock_viewer --send-input` は既知の合成HMD/controller pose、button、thumbstick、trigger、gripを約90 Hzで送る。
-- `scripts/test_phase3.sh` は映像decodeと同時に、合成値がview、action space、boolean/float/vector action stateへ反映されることを検証する。
+- `scripts/test_phase3.sh` は映像decodeと同時に、合成値がview、action space、boolean/float/vector action stateへ反映されることを検証する。native testの出力はpipeを介さずlog fileへ直接書き、子孫processがpipe writerを継承して終了を妨げる経路を作らない。
 
 ### Questクライアント
 

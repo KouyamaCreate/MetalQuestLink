@@ -24,12 +24,16 @@ fi
 
 open -a "${SIM_APP}" >/dev/null 2>&1
 
-XR_RUNTIME_JSON="${RUNTIME_JSON}" \
-XDG_DATA_HOME="${BUILD_DIR}" \
-MAQUESTLINK_ENABLE_API_LAYER=1 \
-MAQUESTLINK_LAYER_LOG="${LAYER_LOG}" \
-XR_LOADER_DEBUG=info \
-  "${CLIENT}" --frames "${MAQUESTLINK_TEST_FRAMES:-120}" 2>&1 | tee "${CLIENT_LOG}"
+if ! XR_RUNTIME_JSON="${RUNTIME_JSON}" \
+  XDG_DATA_HOME="${BUILD_DIR}" \
+  MAQUESTLINK_ENABLE_API_LAYER=1 \
+  MAQUESTLINK_LAYER_LOG="${LAYER_LOG}" \
+  XR_LOADER_DEBUG=info \
+    "${CLIENT}" --frames "${MAQUESTLINK_TEST_FRAMES:-120}" >"${CLIENT_LOG}" 2>&1; then
+  cat "${CLIENT_LOG}"
+  exit 1
+fi
+cat "${CLIENT_LOG}"
 
 rg -q "loaded instance for MaQuestLinkNativeTest" "${LAYER_LOG}"
 rg -q "MAQUESTLINK_FRAME_LOOP_OK" "${CLIENT_LOG}"

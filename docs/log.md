@@ -99,6 +99,14 @@
 - Phase 4でQuest native/Unity側から実際のHMD/controller入力を60 Hz以上で送る。
 - OVRPlugin要求拡張一覧とUnity action bindingはPhase 5のEditor Play modeで実測する。
 
+### Phase 3 回帰修正
+
+- native E2E成功後もtest scriptが終了しない回帰を修正した。
+- 原因はlayerのTCP socketを子孫processのadbが継承し、さらにteeのpipe writerも継承してEOFを妨げていたことだった。
+- listener / accepted socketへclose-on-execを設定し、Phase 1〜3 testはnative出力をlog fileへ直接書くように変更した。
+- 入力E2Eでは、unpacedなSimulatorでもretry中のmock clientが有限frame loop前に接続できるよう500 msのsettle時間を設けた。
+- `scripts/test_phase3.sh`、`scripts/test_phase2.sh`の順で完走し、終了後にTCP 42425を保持するprocessがないことを確認した。
+
 ### Phase 4 変更
 
 - Unity 6000.3.6f1 + Meta XR Core SDK 203.0.0のQuest client projectを追加した。

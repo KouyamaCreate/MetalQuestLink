@@ -343,6 +343,11 @@ int run(int argc, char** argv) {
   XrSession session{XR_NULL_HANDLE};
   check(xrCreateSession(instance, &session_info, &session), "xrCreateSession");
   attach_input_test(session, input_test);
+  if (verify_input) {
+    // The Simulator can run unpaced in batch E2E. Give the retrying mock client time to
+    // connect before the finite frame loop consumes every frame.
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  }
 
   std::uint32_t view_count{};
   check(xrEnumerateViewConfigurationViews(instance, system_id,

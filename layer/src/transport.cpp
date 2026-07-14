@@ -1,6 +1,7 @@
 #include "transport.hpp"
 
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -23,6 +24,11 @@
 namespace {
 
 namespace protocol = maquestlink::protocol;
+
+[[nodiscard]] bool set_close_on_exec(int fd) {
+  const int flags = ::fcntl(fd, F_GETFD);
+  return flags >= 0 && ::fcntl(fd, F_SETFD, flags | FD_CLOEXEC) == 0;
+}
 
 struct Connection {
   explicit Connection(int socket_fd) : fd(socket_fd) {}
@@ -176,6 +182,11 @@ class TransportServer {
     if (server < 0) {
       return;
     }
+    if (!set_close_on_exec(server)) {
+      std::cerr << "[MaQuestLink transport] failed to protect server socket from exec\n";
+      (void)::close(server);
+      return;
+    }
     server_fd_.store(server);
     int reuse = 1;
     (void)::setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
@@ -199,6 +210,11 @@ class TransportServer {
           std::cerr << "[MaQuestLink transport] accept failed: " << std::strerror(errno) << '\n';
         }
         break;
+      }
+      if (!set_close_on_exec(accepted)) {
+        std::cerr << "[MaQuestLink transport] failed to protect client socket from exec\n";
+        (void)::close(accepted);
+        continue;
       }
       int no_sigpipe = 1;
       (void)::setsockopt(accepted, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
