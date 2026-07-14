@@ -65,7 +65,8 @@ LOGCAT_PID="$!"
   --es maquestlink_host 127.0.0.1 \
   --ei maquestlink_port "$PORT"
 
-MAQUESTLINK_PORT="$PORT" MAQUESTLINK_TEST_FRAMES="${MAQUESTLINK_DEVICE_FRAMES:-2400}" \
+MAQUESTLINK_PORT="$PORT" \
+MAQUESTLINK_TEST_FRAMES="${MAQUESTLINK_DEVICE_FRAMES:-2400}" \
   "$ROOT_DIR/scripts/test_phase1.sh" >"$PRODUCER_LOG" 2>&1 &
 PRODUCER_PID="$!"
 wait "$PRODUCER_PID"
@@ -80,12 +81,19 @@ fi
 MAX_RECEIVE="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"received_fps":([0-9]+).*/\1/' | sort -n | tail -1)"
 MAX_DECODE="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"decode_fps":([0-9]+).*/\1/' | sort -n | tail -1)"
 MAX_POSE="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"pose_hz":([0-9]+).*/\1/' | sort -n | tail -1)"
+LAST_LATENCY="$(rg 'MAQUESTLINK_DIAGNOSTIC.*"clock_synced":true' "$LOGCAT_LOG" | \
+  sed -nE 's/.*"capture_to_decode_ms":([0-9]+([.][0-9]+)?).*/\1/p' | tail -1)"
 
 if (( MAX_RECEIVE < 30 || MAX_DECODE < 30 || MAX_POSE < 60 )); then
   echo "Phase 4 device E2E failed: received_fps=$MAX_RECEIVE decode_fps=$MAX_DECODE pose_hz=$MAX_POSE" >&2
   exit 1
 fi
+if ! rg -q 'MAQUESTLINK_DIAGNOSTIC.*"reprojection":"world_fixed".*"clock_synced":true' "$LOGCAT_LOG" || \
+   [[ -z "$LAST_LATENCY" ]]; then
+  echo "Phase 6 device E2E failed: world-fixed reprojection or synchronized latency was not reported" >&2
+  exit 1
+fi
 
-echo "MAQUESTLINK_DEVICE_E2E_OK received_fps=$MAX_RECEIVE decode_fps=$MAX_DECODE pose_hz=$MAX_POSE"
+echo "MAQUESTLINK_DEVICE_E2E_OK received_fps=$MAX_RECEIVE decode_fps=$MAX_DECODE pose_hz=$MAX_POSE capture_to_decode_ms=$LAST_LATENCY"
 echo "Logcat: $LOGCAT_LOG"
 echo "Producer: $PRODUCER_LOG"

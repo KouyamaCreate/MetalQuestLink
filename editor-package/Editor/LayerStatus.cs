@@ -7,6 +7,7 @@ namespace MaQuestLink.Editor
     [Serializable]
     public sealed class LayerStatus
     {
+        public int version;
         public bool connected;
         public ulong encodedFrames;
         public float fps;

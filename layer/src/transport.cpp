@@ -144,6 +144,25 @@ class TransportServer {
           std::scoped_lock lock(pose_mutex_);
           latest_pose_input_ = *pose;
           latest_pose_received_at_ = std::chrono::steady_clock::now();
+        } else if (auto* control = std::get_if<protocol::ControlMessage>(&message.payload);
+                   control != nullptr && control->kind == protocol::ControlKind::Ping) {
+          std::vector<std::byte> echoed_timestamp(sizeof(control->timestamp_ns));
+          for (std::size_t index = 0; index < echoed_timestamp.size(); ++index) {
+            echoed_timestamp[index] =
+                static_cast<std::byte>((control->timestamp_ns >> (index * 8U)) & 0xffU);
+          }
+          const auto host_now_ns = static_cast<std::uint64_t>(
+              std::chrono::duration_cast<std::chrono::nanoseconds>(
+                  std::chrono::steady_clock::now().time_since_epoch())
+                  .count());
+          send_message(protocol::Message{
+              .sequence = message.sequence,
+              .payload = protocol::ControlMessage{
+                  .kind = protocol::ControlKind::Pong,
+                  .timestamp_ns = host_now_ns,
+                  .data = std::move(echoed_timestamp),
+              },
+          });
         }
       }
     } catch (const protocol::ProtocolError& error) {

@@ -13,6 +13,7 @@ namespace MaQuestLink.QuestClient
         public bool IsConfigured => configured;
         public long DecodedFrames => decodedFrames;
         public bool LowLatencyRequested { get; private set; }
+        public double CaptureToDecodeMs { get; private set; } = -1.0;
 
         public bool Configure(VideoCodec videoCodec, int width, int height, AndroidJavaObject surface)
         {
@@ -52,7 +53,7 @@ namespace MaQuestLink.QuestClient
 #endif
         }
 
-        public bool Queue(VideoFrame frame)
+        public bool Queue(VideoFrame frame, long hostMinusClientNs = 0, bool clockSynchronized = false)
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!configured || codec == null || frame == null || frame.EncodedData == null)
@@ -72,7 +73,7 @@ namespace MaQuestLink.QuestClient
                     codec.Call("queueInputBuffer", inputIndex, 0, frame.EncodedData.Length,
                         unchecked((long)(frame.CaptureTimestampNs / 1000ul)), 0);
                 }
-                DrainOutput();
+                DrainOutput(hostMinusClientNs, clockSynchronized);
                 return inputIndex >= 0;
             }
             catch (Exception exception)
@@ -100,6 +101,7 @@ namespace MaQuestLink.QuestClient
 #endif
             configured = false;
             LowLatencyRequested = false;
+            CaptureToDecodeMs = -1.0;
         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -129,7 +131,7 @@ namespace MaQuestLink.QuestClient
             }
         }
 
-        private void DrainOutput()
+        private void DrainOutput(long hostMinusClientNs, bool clockSynchronized)
         {
             while (configured)
             {
@@ -138,7 +140,14 @@ namespace MaQuestLink.QuestClient
                 {
                     break;
                 }
+                var presentationUs = bufferInfo.Get<long>("presentationTimeUs");
                 codec.Call("releaseOutputBuffer", outputIndex, true);
+                if (clockSynchronized)
+                {
+                    var captureInClientNs = presentationUs * 1000L - hostMinusClientNs;
+                    var elapsedNs = unchecked((long)ClockSynchronizer.NowNs() - captureInClientNs);
+                    CaptureToDecodeMs = Math.Max(0.0, elapsedNs / 1_000_000.0);
+                }
                 decodedFrames++;
             }
         }

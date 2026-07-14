@@ -27,12 +27,22 @@ namespace MaQuestLink.QuestClient
         private long sentPoses;
         private long droppedFrames;
         private int connected;
+        private readonly ClockSynchronizer clock = new ClockSynchronizer();
+        private ulong lastPingTimestampNs;
 
         public bool IsConnected => Volatile.Read(ref connected) != 0;
         public long ReceivedFrames => Interlocked.Read(ref receivedFrames);
         public long SentPoses => Interlocked.Read(ref sentPoses);
         public long DroppedFrames => Interlocked.Read(ref droppedFrames);
         public string ConnectedHost { get; private set; } = string.Empty;
+        public bool HasClockSync => clock.IsSynchronized;
+        public long ClockOffsetNs => clock.HostMinusClientNs;
+        public double ClockRoundTripMs => clock.RoundTripMs;
+
+        public double EstimateHostAgeMs(ulong hostTimestampNs, ulong localTimestampNs)
+        {
+            return clock.HostAgeMs(hostTimestampNs, localTimestampNs);
+        }
 
         public void Start(IEnumerable<string> candidateHosts, int serverPort)
         {
@@ -204,6 +214,7 @@ namespace MaQuestLink.QuestClient
                 var message = Protocol.Deserialize(complete);
                 if (message.Payload is VideoFrame video)
                 {
+                    video.ReceiveTimestampNs = ClockSynchronizer.NowNs();
                     lock (videoLock)
                     {
                         while (videoQueue.Count >= 3)
@@ -214,6 +225,12 @@ namespace MaQuestLink.QuestClient
                         videoQueue.Enqueue(video);
                     }
                     Interlocked.Increment(ref receivedFrames);
+                }
+                else if (message.Payload is ControlMessage control &&
+                         control.Kind == ControlKind.Pong && control.Data?.Length == sizeof(ulong))
+                {
+                    clock.Update(ReadUInt64LittleEndian(control.Data), control.TimestampNs,
+                        ClockSynchronizer.NowNs());
                 }
             }
         }
@@ -228,6 +245,15 @@ namespace MaQuestLink.QuestClient
                 {
                     pose = latestPose;
                 }
+                var now = ClockSynchronizer.NowNs();
+                if (lastPingTimestampNs == 0 || now - lastPingTimestampNs >= 1_000_000_000ul)
+                {
+                    lastPingTimestampNs = now;
+                    var ping = Protocol.Serialize(new WireMessage(
+                        unchecked((ulong)Interlocked.Increment(ref sequence)),
+                        new ControlMessage { Kind = ControlKind.Ping, TimestampNs = now }));
+                    await stream.WriteAsync(ping, 0, ping.Length, token).ConfigureAwait(false);
+                }
                 if (pose == null)
                 {
                     continue;
@@ -237,6 +263,16 @@ namespace MaQuestLink.QuestClient
                 await stream.WriteAsync(bytes, 0, bytes.Length, token).ConfigureAwait(false);
                 Interlocked.Increment(ref sentPoses);
             }
+        }
+
+        private static ulong ReadUInt64LittleEndian(byte[] bytes)
+        {
+            ulong value = 0;
+            for (var index = 0; index < sizeof(ulong); index++)
+            {
+                value |= (ulong)bytes[index] << (index * 8);
+            }
+            return value;
         }
 
         private static async Task ReadExactlyAsync(

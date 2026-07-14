@@ -11,12 +11,15 @@ namespace MaQuestLink.QuestClient
         [SerializeField] private int surfaceHeight = 1760;
         [SerializeField] private float distanceMeters = 2.0f;
         [SerializeField] private float widthMeters = 3.2f;
+        [SerializeField] private bool worldFixed = true;
 
         private Component overlay;
         private Type overlayType;
 
         public int SurfaceWidth => surfaceWidth;
         public int SurfaceHeight => surfaceHeight;
+        public bool WorldFixed => worldFixed;
+
 
         public void ConfigureDimensions(int width, int height)
         {
@@ -56,10 +59,49 @@ namespace MaQuestLink.QuestClient
 
         private void LateUpdate()
         {
-            if (transform.parent == null)
+            if (!worldFixed && transform.parent == null)
             {
                 AttachToHead();
             }
+        }
+
+        /// <summary>Macが描画したhead poseへQuadを固定し、Quest compositorのworld-space reprojectionを使う。</summary>
+        public bool ApplyRenderPose(VideoFrame frame)
+        {
+            if (!worldFixed || !TryGetWorldPose(frame, distanceMeters, out var position, out var rotation))
+            {
+                return false;
+            }
+            transform.SetParent(null, true);
+            transform.SetPositionAndRotation(position, rotation);
+            ApplyScale();
+            return true;
+        }
+
+        public static bool TryGetWorldPose(
+            VideoFrame frame, float distance, out Vector3 position, out Quaternion rotation)
+        {
+            position = default;
+            rotation = Quaternion.identity;
+            if (frame?.RenderViews == null || frame.RenderViews.Length != 2 || distance <= 0.0f)
+            {
+                return false;
+            }
+            var left = frame.RenderViews[0].Pose;
+            var right = frame.RenderViews[1].Pose;
+            const PoseFlags required = PoseFlags.PositionValid | PoseFlags.OrientationValid;
+            if ((left.Flags & required) != required || (right.Flags & required) != required)
+            {
+                return false;
+            }
+            var leftPosition = ToUnity(left.Position);
+            var rightPosition = ToUnity(right.Position);
+            var leftRotation = ToUnity(left.Orientation);
+            var rightRotation = ToUnity(right.Orientation);
+            rotation = Quaternion.Slerp(leftRotation, rightRotation, 0.5f).normalized;
+            var renderHeadPosition = (leftPosition + rightPosition) * 0.5f;
+            position = renderHeadPosition + rotation * Vector3.forward * distance;
+            return true;
         }
 
         private void EnsureOverlay()
@@ -98,9 +140,19 @@ namespace MaQuestLink.QuestClient
             transform.SetParent(camera.transform, false);
             transform.localPosition = new Vector3(0.0f, 0.0f, distanceMeters);
             transform.localRotation = Quaternion.identity;
+            ApplyScale();
+        }
+
+        private void ApplyScale()
+        {
             var height = widthMeters * surfaceHeight / Math.Max(1.0f, surfaceWidth);
             transform.localScale = new Vector3(widthMeters, height, 1.0f);
         }
+
+        private static Vector3 ToUnity(Vector3f value) => new Vector3(value.X, value.Y, -value.Z);
+
+        private static Quaternion ToUnity(Quaternionf value) =>
+            new Quaternion(-value.X, -value.Y, value.Z, value.W);
 
         private object GetMember(string name)
         {

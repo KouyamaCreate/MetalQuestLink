@@ -137,3 +137,29 @@
 - Meta XR Core SDK 203.0.0は公式tarballのローカル展開を検証時だけ使用した。`samples/MetaXRMinimal/Packages/manifest.json` は公開registryの`203.0.0`指定へ復元される。
 - `scripts/test_phase5.sh` 最終runはEditor package EditMode 1/1、sample PlayMode 1/1 passed。sample内で`OVRCameraRig`と`OVRGrabbable`の存在も確認した。
 - Quest実機は未接続のため、Editor windowがconnected状態へ遷移し、実fps/latencyを表示する経路は未実測。
+
+## 2026-07-15 — Phase 6 実測
+
+### world-fixed再投影
+
+- Macが送る左右eye render poseは、Questから送ったtracking poseをlayerがUnity OpenXRへ注入した結果と同じtracking origin上にある。
+- Quest側で左右position / orientationを平均し、render head poseの2 m前へExternal Surface Quadをworld配置する。frame間はtransformをheadへ追従させないため、Meta compositorが現在head poseとの差を再投影する。
+- pure EditMode testでOpenXR position `(-0.032,1,-2)` / `(0.032,1,-2)` がUnity world center `(0,1,2)`、Quad position `(0,1,4)`になること、invalid poseを拒否することを確認した。
+- Quest実機がないため、頭を動かした際の見え方とcompositorへの実表示は未確認。
+
+### clock同期と計測範囲
+
+- MacとQuestの`steady_clock` / `Stopwatch`はepochが異なる。Control PingはQuest送信時刻、PongはMac受信時刻とechoしたQuest送信時刻を持つ。
+- Questは往復時間の中央をMac受信瞬間とみなし、`host - client` offsetを1秒周期で更新する。USB / LANの往復非対称性は誤差として残る。
+- `capture_to_receive_ms` はMac `xrEndFrame` hookからQuest TCP deserializeまで、`capture_to_decode_ms` はMediaCodec outputをExternal Surfaceへreleaseした直後まで。
+- Editor / doctor向けhost status JSONは後方互換判定用のschema `version: 1`を持つ。
+- display scanout / panel発光は観測していないため、motion-to-photon値とは呼ばない。
+- native mock E2EはPingにPongが返ることを映像・入力と同じconnection上で確認した。Quest EditModeはclock offset / RTT / age換算を既知値で確認した。
+
+### Phase 6回帰run
+
+- `scripts/test_phase3.sh`: 3360x1760 H.264 received / decoded 120/120、76.2646 fps、PoseInput 136 samples、`clock_sync=1`。
+- 120-frame平均Metal copy 1.82951 ms、VideoToolbox encode 15.5753 ms、合計17.40481 ms。
+- Quest EditMode 7/7、IL2CPP / ARM64 APK build成功。
+- Phase 0〜5のMac/Simulator/Unity検証を最終状態で再実行し成功。device E2EだけはQuest未接続のためexit 2。
+- `scripts/test_quest_client.sh` / `build_quest_client.sh` / `test_phase5.sh` は公式Meta XR Core 203.0.0 tarballのローカル展開がある場合だけ一時利用し、終了時に公開registry manifest / lockへ戻す。

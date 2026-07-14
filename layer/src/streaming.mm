@@ -109,6 +109,7 @@ void write_status(bool force = false) {
     return;
   }
   output << "{\n"
+         << "  \"version\": 1,\n"
          << "  \"connected\": " << (transport_connected() ? "true" : "false") << ",\n"
          << "  \"encodedFrames\": " << frames << ",\n"
          << "  \"fps\": " << fps << ",\n"

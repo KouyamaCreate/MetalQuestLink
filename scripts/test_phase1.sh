@@ -22,7 +22,7 @@ if [[ ! -x "${CLIENT}" ]]; then
   exit 2
 fi
 
-open -a "${SIM_APP}"
+open -a "${SIM_APP}" >/dev/null 2>&1
 
 XR_RUNTIME_JSON="${RUNTIME_JSON}" \
 XDG_DATA_HOME="${BUILD_DIR}" \

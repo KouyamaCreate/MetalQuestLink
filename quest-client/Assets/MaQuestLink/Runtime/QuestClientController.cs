@@ -20,6 +20,7 @@ namespace MaQuestLink.QuestClient
         private long previousReceived;
         private long previousDecoded;
         private long previousSent;
+        private double captureToReceiveMs = -1.0;
 
         private void Awake()
         {
@@ -67,6 +68,9 @@ namespace MaQuestLink.QuestClient
 
         private void Present(VideoFrame frame)
         {
+            presenter.ApplyRenderPose(frame);
+            captureToReceiveMs = transport.EstimateHostAgeMs(
+                frame.CaptureTimestampNs, frame.ReceiveTimestampNs);
             if (!decoder.IsConfigured)
             {
                 presenter.ConfigureDimensions((int)frame.Width, (int)frame.Height);
@@ -79,7 +83,7 @@ namespace MaQuestLink.QuestClient
                     }
                 }
             }
-            decoder.Queue(frame);
+            decoder.Queue(frame, transport.ClockOffsetNs, transport.HasClockSync);
         }
 
         private void EmitDiagnostic()
@@ -99,6 +103,11 @@ namespace MaQuestLink.QuestClient
                 pose_hz = sent - previousSent,
                 dropped = transport.DroppedFrames,
                 low_latency = decoder.LowLatencyRequested,
+                reprojection = presenter.WorldFixed ? "world_fixed" : "head_fixed",
+                clock_synced = transport.HasClockSync,
+                clock_rtt_ms = transport.ClockRoundTripMs,
+                capture_to_receive_ms = captureToReceiveMs,
+                capture_to_decode_ms = decoder.CaptureToDecodeMs,
             };
             previousReceived = received;
             previousDecoded = decoded;
@@ -141,6 +150,11 @@ namespace MaQuestLink.QuestClient
             public long pose_hz;
             public long dropped;
             public bool low_latency;
+            public string reprojection;
+            public bool clock_synced;
+            public double clock_rtt_ms;
+            public double capture_to_receive_ms;
+            public double capture_to_decode_ms;
         }
     }
 }

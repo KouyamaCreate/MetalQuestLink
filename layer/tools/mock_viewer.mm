@@ -98,8 +98,25 @@ struct Options {
 
 void send_synthetic_input(std::stop_token stop, int socket_fd,
                           std::atomic<std::uint64_t>& sent_count) {
+  const std::uint64_t ping_timestamp = monotonic_now_ns();
+  const auto ping = protocol::serialize(protocol::Message{
+      .sequence = 0,
+      .payload = protocol::ControlMessage{
+          .kind = protocol::ControlKind::Ping,
+          .timestamp_ns = ping_timestamp,
+      },
+  });
+  std::size_t ping_offset{};
+  while (ping_offset < ping.size() && !stop.stop_requested()) {
+    const ssize_t sent =
+        ::send(socket_fd, ping.data() + ping_offset, ping.size() - ping_offset, 0);
+    if (sent <= 0) {
+      return;
+    }
+    ping_offset += static_cast<std::size_t>(sent);
+  }
   while (!stop.stop_requested()) {
-    const std::uint64_t sequence = sent_count.load();
+    const std::uint64_t sequence = sent_count.load() + 1;
     const protocol::Message message{
         .sequence = sequence,
         .payload = protocol::PoseInput{
@@ -337,8 +354,17 @@ int run(int argc, char** argv) {
   std::uint64_t received{};
   std::uint32_t width{};
   std::uint32_t height{};
+  bool clock_sync{};
   while (stats.decoded.load() < static_cast<std::uint64_t>(options.frames)) {
     const protocol::Message message = receive_message(socket_fd);
+    if (const auto* control = std::get_if<protocol::ControlMessage>(&message.payload);
+        control != nullptr && control->kind == protocol::ControlKind::Pong) {
+      if (control->timestamp_ns == 0 || control->data.size() != sizeof(std::uint64_t)) {
+        throw std::runtime_error("invalid clock synchronization Pong");
+      }
+      clock_sync = true;
+      continue;
+    }
     const auto* frame = std::get_if<protocol::VideoFrame>(&message.payload);
     if (frame == nullptr) {
       continue;
@@ -366,10 +392,13 @@ int run(int argc, char** argv) {
   if (input_thread.has_value()) {
     input_thread->request_stop();
     input_thread->join();
+    if (!clock_sync) {
+      throw std::runtime_error("layer did not reply to clock synchronization Ping");
+    }
   }
   std::cout << "MAQUESTLINK_VIDEO_E2E_OK received=" << received << " decoded=" << decoded
             << " fps=" << fps << " width=" << width << " height=" << height
-            << " input_sent=" << sent_input.load() << '\n';
+            << " input_sent=" << sent_input.load() << " clock_sync=" << clock_sync << '\n';
   if (fps < options.minimum_fps) {
     throw std::runtime_error("decoded frame rate is below the required minimum");
   }

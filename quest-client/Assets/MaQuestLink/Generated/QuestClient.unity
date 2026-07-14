@@ -464,6 +464,7 @@ MonoBehaviour:
   surfaceHeight: 1760
   distanceMeters: 2
   widthMeters: 3.2
+  worldFixed: 1
 --- !u!1 &975709019
 GameObject:
   m_ObjectHideFlags: 0

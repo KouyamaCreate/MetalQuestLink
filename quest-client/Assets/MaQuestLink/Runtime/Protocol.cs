@@ -111,6 +111,8 @@ namespace MaQuestLink.QuestClient
         public byte EyeCount = 2;
         public ushort Flags;
         public byte[] EncodedData = Array.Empty<byte>();
+        // Quest-local receive time. This is transport metadata and is not serialized.
+        public ulong ReceiveTimestampNs;
     }
 
     public sealed class PoseInput

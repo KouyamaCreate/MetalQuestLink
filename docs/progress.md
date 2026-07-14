@@ -10,8 +10,8 @@
 | 3 — 入力パイプライン | 完了 | view/space/action合成入力E2E成功、PoseInput 138 samples |
 | 4 — Questクライアント | 完了 | EditMode 4/4成功、Unity 6000.3.6f1でarm64 APK build成功 |
 | 5 — Unityエディタ統合 | 完了 | EditMode 1/1、Meta XR Simulator PlayMode 1/1、layer load・接続待ち確認 |
-| 6 — 再投影・計測・ドキュメント | 未着手 | — |
 | 7 — 配布パッケージング | 未着手 | — |
+| 6 — 再投影・計測・ドキュメント | 完了 | world pose / clock unit 3/3、clock sync E2E、Phase 0〜5回帰成功 |
 | 8 — Quest機能の拡張対応 | 未着手 | — |
 
 ## Phase 0
@@ -131,3 +131,29 @@
   - `Window > MaQuestLink` で `Install Quest APK` を1回実行する。
   - Meta XR Simulatorを選択してPlayする。layer登録、adb reverse、client起動は自動実行される。
 - 詳細な実測結果: `docs/notes.md` の「Phase 5」を参照。
+
+## Phase 6
+
+- 成果物:
+  - VideoFrameのstereo render poseを使うworld-fixed `OVROverlay` Quadを既定化
+  - Quest Ping / Mac Pongによるmonotonic clock offset・RTT推定
+  - Mac capture→Quest receive / MediaCodec Surface releaseの段階別遅延診断
+  - 実機E2Eへworld-fixed、clock sync、`capture_to_decode_ms`判定を追加
+  - ゼロからPlayまで、構成図、実測、制約、troubleshootingを含む日本語README
+- unit / build:
+  - `cmake --build build -j8 && ctest --test-dir build --output-on-failure`: 成功、1/1 passed。
+  - `scripts/test_quest_client.sh`: 成功、EditMode 7/7 passed。clock換算、OpenXR→Unity world pose、invalid pose fallbackを含む。
+  - `scripts/build_quest_client.sh`: 成功、Unity IL2CPP / ARM64 APK生成。
+- timestamp / input / video E2E:
+  - `scripts/test_phase3.sh`: 成功。Ping/Pong応答、合成入力注入、H.264 120/120 decodeを同時確認。
+  - 最終計測は76.2646 fps、平均copy 1.82951 ms、平均encode 15.5753 ms、合計17.40481 ms。
+- Phase 0〜5 regression:
+  - `scripts/test_phase1.sh`: 成功、120-frame Metal loopとlayer load。
+  - `scripts/test_phase2.sh`: 成功、未接続60 frames、接続120/120 decode・30 fps以上。
+  - `scripts/test_phase3.sh`: 成功、input / video / clock sync。
+  - `scripts/test_quest_client.sh`: 成功、7/7。
+  - `scripts/build_quest_client.sh`: 成功。
+  - `scripts/test_phase5.sh`: 成功、EditMode 1/1、PlayMode 1/1。
+- Quest device E2E:
+  - `scripts/e2e_device.sh` は実機未接続を検出しexit 2。実機値は未実測。
+- 詳細な実測結果: `docs/notes.md` の「Phase 6」を参照。

@@ -146,3 +146,29 @@
 
 - Quest未接続のため、Editor windowのconnected/fps/latency実値表示は実機E2Eで確認する。
 - Phase 6でworld-fixed再投影とmotion-to-photon計測を実装する。
+
+### Phase 6 変更
+
+- stereo render poseからQuest world座標上のQuad poseを復元し、world-fixed compositor再投影を既定化した。
+- Control Ping/PongをMac layerとQuest transportへ実装し、別epochのmonotonic clockを近似同期した。
+- capture→receive / MediaCodec Surface release、clock RTTをQuest診断へ追加した。
+- mock clientへclock sync E2Eを追加し、Quest unit testを7件へ拡張した。
+- device E2Eへ再投影mode・clock同期・capture-to-decode判定を追加した。
+- READMEを第三者向けの日本語setup / architecture / troubleshooting documentへ更新した。
+- mock E2E portを製品portと分離し、Simulator/adb reverseとのテスト間競合を解消した。
+
+### Phase 6 理由
+
+- network/decode遅延中のhead motionをworld-space compositorで補正し、Mac/Quest間の段階別遅延を共通基準で観測するため。
+
+### Phase 6 影響
+
+- `layer/src/transport.cpp`、`layer/tools/mock_viewer.mm`
+- `quest-client/Assets/MaQuestLink/Runtime/`、`Tests/EditMode/`
+- `scripts/test_phase1.sh`、`test_phase2.sh`、`test_phase3.sh`、`test_quest_client.sh`、`build_quest_client.sh`、`e2e_device.sh`、`test_phase5.sh`
+- `README.md`、`docs/`、`session.md`
+
+### Phase 6 残り
+
+- Quest実機未接続のため、world-fixed表示の目視、MediaCodec Surface、capture-to-receive / decode実値は未確認。
+- Phase 7でnative layer / APKをUPM packageへ同梱し、repository build不要の配布物を作る。

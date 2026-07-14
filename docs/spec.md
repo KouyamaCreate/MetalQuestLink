@@ -65,6 +65,16 @@
 - `samples/MetaXRMinimal/` はUnity 6000.3 project。Meta XR Core SDK 203.0.0の`OVRCameraRig`、左右Touch controllerの`OVRGrabber`、`OVRGrabbable` cubeを生成する。
 - `scripts/test_phase5.sh` はsample生成、package manifest EditMode test、Meta XR Simulator上のPlayMode testを実行し、Unity applicationへのlayer loadと未接続待ち状態を検証する。PlayMode runはMetal graphics deviceが必要なため`-nographics`を使わない。
 
+### 再投影とレイテンシ計測
+
+- Quest clientはVideoFrameの左右render poseを平均してrender head poseを復元する。OpenXR右手座標からUnity左手座標へposition `(x,y,-z)`、orientation `(-x,-y,z,w)` で変換する。
+- `OVROverlay` Quadはrender head poseの2 m前へworld配置する。新しいVideoFrameごとにのみposeを更新し、その後のhead motionはQuest compositorのworld-space reprojectionへ任せる。world-fixedが既定で、pose valid flag不足時は既存head-fixed配置を維持する。
+- Quest clientは1秒周期でclient monotonic timestampを持つControl Pingを送る。Mac layerは受信host monotonic timestampと元client timestampを持つPongを即時返信する。
+- QuestはPing送信/受信の中央時刻とhost受信時刻から`host - client` offsetを推定する。このoffsetでMac capture timestampをQuest clockへ写し、capture→TCP受信とcapture→MediaCodec output Surface releaseを計測する。
+- `MAQUESTLINK_DIAGNOSTIC` は`reprojection`、`clock_synced`、`clock_rtt_ms`、`capture_to_receive_ms`、`capture_to_decode_ms`を含む。未同期値は`-1`。
+- Mac layer statusはschema `version: 1`とconnection、copy、encode、合計pipeline msを安定した`Library/MaQuestLink/status.json`へ出す。Quest側decode値はSurface releaseまでであり、光学的motion-to-photonではない。
+- `scripts/e2e_device.sh` は既存fps / pose Hzに加え、world-fixed、clock sync、capture-to-decode値を判定する。
+
 ## 未実装
 
-- world-fixed再投影、配布パッケージ、Phase 8のQuest拡張機能
+- 配布パッケージ、Phase 8のQuest拡張機能

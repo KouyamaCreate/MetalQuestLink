@@ -77,7 +77,7 @@ fi
   -testResults "${EDIT_RESULTS}" \
   -logFile "${EDIT_LOG}"
 
-open -a "${SIM_APP}"
+open -a "${SIM_APP}" >/dev/null 2>&1
 
 XR_RUNTIME_JSON="${RUNTIME_JSON}" \
 MAQUESTLINK_ENABLE_API_LAYER=1 \

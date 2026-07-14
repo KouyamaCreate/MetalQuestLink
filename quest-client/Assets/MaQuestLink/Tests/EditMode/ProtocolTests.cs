@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace MaQuestLink.QuestClient.Tests
 {
@@ -103,21 +104,79 @@ namespace MaQuestLink.QuestClient.Tests
                     await stream.WriteAsync(videoBytes, 0, videoBytes.Length);
 
                     transport.SubmitLatestPose(CreatePoseInput());
-                    var receivedHeader = new byte[Protocol.HeaderSize];
-                    await ReadExactlyWithTimeout(stream, receivedHeader, 3000);
-                    var header = Protocol.ParseHeader(receivedHeader);
-                    Assert.That(header.Type, Is.EqualTo(MessageType.PoseInput));
-                    var payload = new byte[header.PayloadSize];
-                    await ReadExactlyWithTimeout(stream, payload, 3000);
+                    MessageHeader header;
+                    while (true)
+                    {
+                        var receivedHeader = new byte[Protocol.HeaderSize];
+                        await ReadExactlyWithTimeout(stream, receivedHeader, 3000);
+                        header = Protocol.ParseHeader(receivedHeader);
+                        var payload = new byte[header.PayloadSize];
+                        await ReadExactlyWithTimeout(stream, payload, 3000);
+                        var complete = new byte[Protocol.HeaderSize + payload.Length];
+                        Buffer.BlockCopy(receivedHeader, 0, complete, 0, receivedHeader.Length);
+                        Buffer.BlockCopy(payload, 0, complete, receivedHeader.Length, payload.Length);
+                        var message = Protocol.Deserialize(complete);
+                        if (message.Payload is ControlMessage ping && ping.Kind == ControlKind.Ping)
+                        {
+                            var pong = new ControlMessage
+                            {
+                                Kind = ControlKind.Pong,
+                                TimestampNs = ping.TimestampNs + 1_000_000ul,
+                                Data = ToLittleEndian(ping.TimestampNs),
+                            };
+                            var pongBytes = Protocol.Serialize(new WireMessage(99, pong));
+                            await stream.WriteAsync(pongBytes, 0, pongBytes.Length);
+                            continue;
+                        }
+                        Assert.That(header.Type, Is.EqualTo(MessageType.PoseInput));
+                        break;
+                    }
 
                     VideoFrame received = null;
                     await WaitUntil(() => transport.TryDequeueLatestVideo(out received), 3000);
                     Assert.That(received.Width, Is.EqualTo(100));
                     Assert.That(transport.ReceivedFrames, Is.EqualTo(1));
                     Assert.That(transport.SentPoses, Is.EqualTo(1));
+                    await WaitUntil(() => transport.HasClockSync, 3000);
+                    Assert.That(transport.ClockRoundTripMs, Is.GreaterThanOrEqualTo(0));
                 }
             }
             listener.Stop();
+        }
+
+        [Test]
+        public void ClockSynchronizer_ConvertsHostTimestampsToClientAge()
+        {
+            var clock = new ClockSynchronizer();
+            clock.Update(100, 1110, 120);
+
+            Assert.IsTrue(clock.IsSynchronized);
+            Assert.That(clock.HostMinusClientNs, Is.EqualTo(1000));
+            Assert.That(clock.RoundTripMs, Is.EqualTo(0.00002).Within(0.000001));
+            Assert.That(clock.HostAgeMs(1120, 150), Is.EqualTo(0.00003).Within(0.000001));
+        }
+
+        [Test]
+        public void WorldFixedPose_UsesStereoRenderPoseInUnityCoordinates()
+        {
+            var frame = new VideoFrame();
+            frame.RenderViews[0].Pose = ValidPose(-0.032f, 1.0f, -2.0f);
+            frame.RenderViews[1].Pose = ValidPose(0.032f, 1.0f, -2.0f);
+
+            Assert.IsTrue(ExternalSurfacePresenter.TryGetWorldPose(
+                frame, 2.0f, out var position, out var rotation));
+            Assert.That(position.x, Is.EqualTo(0.0f).Within(0.0001f));
+            Assert.That(position.y, Is.EqualTo(1.0f).Within(0.0001f));
+            Assert.That(position.z, Is.EqualTo(4.0f).Within(0.0001f));
+            Assert.That(Quaternion.Angle(rotation, Quaternion.identity), Is.LessThan(0.01f));
+        }
+
+        [Test]
+        public void WorldFixedPose_RejectsInvalidTrackingPose()
+        {
+            var frame = new VideoFrame();
+            Assert.IsFalse(ExternalSurfacePresenter.TryGetWorldPose(
+                frame, 2.0f, out _, out _));
         }
 
         private static PoseInput CreatePoseInput()
@@ -148,6 +207,26 @@ namespace MaQuestLink.QuestClient.Tests
                     Grip = 0.875f,
                 },
             };
+        }
+
+        private static PoseState ValidPose(float x, float y, float z)
+        {
+            return new PoseState
+            {
+                Position = new Vector3f { X = x, Y = y, Z = z },
+                Orientation = new Quaternionf { W = 1.0f },
+                Flags = PoseFlags.PositionValid | PoseFlags.OrientationValid,
+            };
+        }
+
+        private static byte[] ToLittleEndian(ulong value)
+        {
+            var bytes = new byte[sizeof(ulong)];
+            for (var index = 0; index < bytes.Length; index++)
+            {
+                bytes[index] = (byte)(value >> (index * 8));
+            }
+            return bytes;
         }
 
         private static async Task<T> WithTimeout<T>(Task<T> task, int milliseconds)
