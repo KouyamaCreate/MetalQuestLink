@@ -9,6 +9,8 @@
 #include <mutex>
 #include <string>
 
+#include "streaming.hpp"
+
 namespace {
 
 constexpr const char* kLayerName = "XR_APILAYER_MAQUESTLINK_streaming";
@@ -51,6 +53,7 @@ XRAPI_ATTR XrResult XRAPI_CALL layer_destroy_instance(XrInstance instance) {
     result = reinterpret_cast<PFN_xrDestroyInstance>(function)(instance);
   }
   if (XR_SUCCEEDED(result)) {
+    streaming_unregister_instance(instance);
     std::scoped_lock lock(g_mutex);
     g_instances.erase(instance);
   }
@@ -73,6 +76,10 @@ XRAPI_ATTR XrResult XRAPI_CALL layer_get_instance_proc_addr(XrInstance instance,
   }
   if (std::strcmp(name, "xrDestroyInstance") == 0) {
     *function = reinterpret_cast<PFN_xrVoidFunction>(layer_destroy_instance);
+    return XR_SUCCESS;
+  }
+
+  if (streaming_get_proc_addr(name, function)) {
     return XR_SUCCESS;
   }
 
@@ -103,6 +110,7 @@ XRAPI_ATTR XrResult XRAPI_CALL layer_create_api_layer_instance(
     std::scoped_lock lock(g_mutex);
     g_instances.emplace(*instance, InstanceDispatch{layer_info->nextInfo->nextGetInstanceProcAddr});
   }
+  streaming_register_instance(*instance, layer_info->nextInfo->nextGetInstanceProcAddr);
   log_line(std::string("loaded instance for ") + info->applicationInfo.applicationName);
   return XR_SUCCESS;
 }

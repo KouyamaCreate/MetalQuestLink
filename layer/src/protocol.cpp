@@ -139,6 +139,24 @@ void write_controller(Writer& writer, const ControllerState& controller) {
   return controller;
 }
 
+void write_eye_view(Writer& writer, const EyeView& view) {
+  write_pose(writer, view.pose);
+  writer.write(view.fov.angle_left);
+  writer.write(view.fov.angle_right);
+  writer.write(view.fov.angle_up);
+  writer.write(view.fov.angle_down);
+}
+
+[[nodiscard]] EyeView read_eye_view(Reader& reader) {
+  EyeView view;
+  view.pose = read_pose(reader);
+  view.fov.angle_left = reader.read<float>();
+  view.fov.angle_right = reader.read<float>();
+  view.fov.angle_up = reader.read<float>();
+  view.fov.angle_down = reader.read<float>();
+  return view;
+}
+
 [[nodiscard]] MessageType type_of(const Payload& payload) {
   return std::visit(
       [](const auto& value) -> MessageType {
@@ -161,7 +179,9 @@ void write_controller(Writer& writer, const ControllerState& controller) {
         using T = std::decay_t<decltype(value)>;
         if constexpr (std::is_same_v<T, VideoFrame>) {
           writer.write(value.capture_timestamp_ns);
-          write_pose(writer, value.render_pose);
+          for (const auto& view : value.render_views) {
+            write_eye_view(writer, view);
+          }
           writer.write(value.width);
           writer.write(value.height);
           writer.write(value.codec);
@@ -204,7 +224,9 @@ void require_no_trailing_bytes(const Reader& reader) {
     case MessageType::VideoFrame: {
       VideoFrame value;
       value.capture_timestamp_ns = reader.read<std::uint64_t>();
-      value.render_pose = read_pose(reader);
+      for (auto& view : value.render_views) {
+        view = read_eye_view(reader);
+      }
       value.width = reader.read<std::uint32_t>();
       value.height = reader.read<std::uint32_t>();
       value.codec = reader.read<VideoCodec>();

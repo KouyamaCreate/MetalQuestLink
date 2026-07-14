@@ -46,3 +46,29 @@
 
 - Phase 2で `xrEndFrame` とswapchain imageを追跡し、VideoToolbox/TCP送信を実装する。
 - OVRPluginが要求する拡張一覧はUnity側を起動するPhase 1〜3の後続実測で記録する。
+
+### Phase 2 変更
+
+- session/swapchainとMetal textureを追跡して `xrEndFrame` から左右眼映像を取得するhookを追加した。
+- VideoToolbox H.264 low-latency encoderとloopback TCP serverを追加した。
+- VideoFrameを左右眼それぞれのrender pose/FOVを持つ形式へ拡張した。
+- H.264を実デコードしてfpsとmetadataを検証するmacOS mock viewerを追加した。
+- `scripts/test_phase2.sh` に未接続pass-throughと接続loopback E2Eを自動化した。
+
+### Phase 2 理由
+
+- Questクライアント実装前に、最大帯域の映像経路とフレームmetadataをヘッドセットなしで実証するため。
+
+### Phase 2 影響
+
+- `layer/CMakeLists.txt`
+- `layer/include/maquestlink/protocol.hpp`
+- `layer/src/openxr_layer.cpp`、`layer/src/protocol.cpp`、`layer/src/streaming.*`
+- `layer/tools/mock_viewer.mm`、`layer/tests/protocol_tests.cpp`
+- `scripts/test_phase2.sh`
+- `README.md`、`docs/`
+
+### Phase 2 残り
+
+- Phase 3で同じTCP接続の受信側を追加し、Quest由来のpose/inputをOpenXRへ注入する。
+- Unity/OVRPlugin固有のswapchain構成はPhase 5で実測する。

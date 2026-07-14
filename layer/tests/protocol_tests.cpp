@@ -35,12 +35,22 @@ protocol::Pose pose(float seed) {
   };
 }
 
+protocol::EyeView eye_view(float seed) {
+  return {
+      .pose = pose(seed),
+      .fov = {.angle_left = -seed,
+              .angle_right = seed + 0.1F,
+              .angle_up = seed + 0.2F,
+              .angle_down = -seed - 0.3F},
+  };
+}
+
 void test_video_round_trip() {
   const protocol::Message expected{
       .sequence = 42,
       .payload = protocol::VideoFrame{
           .capture_timestamp_ns = 123456789,
-          .render_pose = pose(1.0F),
+          .render_views = {eye_view(1.0F), eye_view(2.0F)},
           .width = 3664,
           .height = 1920,
           .codec = protocol::VideoCodec::H264,

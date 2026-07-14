@@ -61,9 +61,25 @@ struct ControllerState {
   bool operator==(const ControllerState&) const = default;
 };
 
+struct Fov {
+  float angle_left{};
+  float angle_right{};
+  float angle_up{};
+  float angle_down{};
+
+  bool operator==(const Fov&) const = default;
+};
+
+struct EyeView {
+  Pose pose{};
+  Fov fov{};
+
+  bool operator==(const EyeView&) const = default;
+};
+
 struct VideoFrame {
   std::uint64_t capture_timestamp_ns{};
-  Pose render_pose{};
+  std::array<EyeView, 2> render_views{};
   std::uint32_t width{};
   std::uint32_t height{};
   VideoCodec codec{VideoCodec::H264};
