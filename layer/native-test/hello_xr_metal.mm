@@ -5,7 +5,9 @@
 #include <openxr/openxr_platform.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -64,6 +66,173 @@ struct SessionState {
   bool exit_requested{};
 };
 
+struct InputTest {
+  bool enabled{};
+  XrPath left_path{XR_NULL_PATH};
+  XrPath right_path{XR_NULL_PATH};
+  XrActionSet action_set{XR_NULL_HANDLE};
+  XrAction pose_action{XR_NULL_HANDLE};
+  XrAction primary_action{XR_NULL_HANDLE};
+  XrAction trigger_action{XR_NULL_HANDLE};
+  XrAction thumbstick_action{XR_NULL_HANDLE};
+  XrSpace left_action_space{XR_NULL_HANDLE};
+  bool views_verified{};
+  bool actions_verified{};
+  bool space_verified{};
+};
+
+[[nodiscard]] XrPosef identity_pose() {
+  return {.orientation = {.x = 0, .y = 0, .z = 0, .w = 1},
+          .position = {.x = 0, .y = 0, .z = 0}};
+}
+
+[[nodiscard]] XrAction create_action(XrActionSet action_set, XrActionType type,
+                                     const char* name, const char* localized_name,
+                                     const std::array<XrPath, 2>& subactions) {
+  XrActionCreateInfo info{.type = XR_TYPE_ACTION_CREATE_INFO, .next = nullptr};
+  std::strncpy(info.actionName, name, XR_MAX_ACTION_NAME_SIZE - 1);
+  info.actionType = type;
+  info.countSubactionPaths = static_cast<std::uint32_t>(subactions.size());
+  info.subactionPaths = subactions.data();
+  std::strncpy(info.localizedActionName, localized_name,
+               XR_MAX_LOCALIZED_ACTION_NAME_SIZE - 1);
+  XrAction action{XR_NULL_HANDLE};
+  check(xrCreateAction(action_set, &info, &action), "xrCreateAction");
+  return action;
+}
+
+[[nodiscard]] InputTest create_input_test(XrInstance instance, bool enabled) {
+  InputTest test{.enabled = enabled};
+  if (!enabled) {
+    return test;
+  }
+  check(xrStringToPath(instance, "/user/hand/left", &test.left_path),
+        "xrStringToPath(left)");
+  check(xrStringToPath(instance, "/user/hand/right", &test.right_path),
+        "xrStringToPath(right)");
+  const std::array<XrPath, 2> subactions = {test.left_path, test.right_path};
+
+  XrActionSetCreateInfo set_info{.type = XR_TYPE_ACTION_SET_CREATE_INFO, .next = nullptr};
+  std::strncpy(set_info.actionSetName, "maquestlink_input", XR_MAX_ACTION_SET_NAME_SIZE - 1);
+  std::strncpy(set_info.localizedActionSetName, "MaQuestLink Input",
+               XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE - 1);
+  set_info.priority = 0;
+  check(xrCreateActionSet(instance, &set_info, &test.action_set), "xrCreateActionSet");
+  test.pose_action = create_action(test.action_set, XR_ACTION_TYPE_POSE_INPUT, "controller_pose",
+                                   "Controller Pose", subactions);
+  test.primary_action = create_action(test.action_set, XR_ACTION_TYPE_BOOLEAN_INPUT,
+                                      "primary_button", "Primary Button", subactions);
+  test.trigger_action = create_action(test.action_set, XR_ACTION_TYPE_FLOAT_INPUT, "trigger",
+                                      "Trigger", subactions);
+  test.thumbstick_action = create_action(test.action_set, XR_ACTION_TYPE_VECTOR2F_INPUT,
+                                         "thumbstick", "Thumbstick", subactions);
+
+  auto path = [instance](const char* value) {
+    XrPath result{XR_NULL_PATH};
+    check(xrStringToPath(instance, value, &result), "xrStringToPath(binding)");
+    return result;
+  };
+  const std::array<XrActionSuggestedBinding, 8> bindings = {{
+      {.action = test.pose_action, .binding = path("/user/hand/left/input/grip/pose")},
+      {.action = test.pose_action, .binding = path("/user/hand/right/input/grip/pose")},
+      {.action = test.primary_action, .binding = path("/user/hand/left/input/x/click")},
+      {.action = test.primary_action, .binding = path("/user/hand/right/input/a/click")},
+      {.action = test.trigger_action, .binding = path("/user/hand/left/input/trigger/value")},
+      {.action = test.trigger_action, .binding = path("/user/hand/right/input/trigger/value")},
+      {.action = test.thumbstick_action, .binding = path("/user/hand/left/input/thumbstick")},
+      {.action = test.thumbstick_action, .binding = path("/user/hand/right/input/thumbstick")},
+  }};
+  XrPath profile{XR_NULL_PATH};
+  check(xrStringToPath(instance, "/interaction_profiles/meta/touch_plus_controller", &profile),
+        "xrStringToPath(touch_plus_controller)");
+  const XrInteractionProfileSuggestedBinding suggestion{
+      .type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+      .next = nullptr,
+      .interactionProfile = profile,
+      .countSuggestedBindings = static_cast<std::uint32_t>(bindings.size()),
+      .suggestedBindings = bindings.data(),
+  };
+  check(xrSuggestInteractionProfileBindings(instance, &suggestion),
+        "xrSuggestInteractionProfileBindings(touch_plus_controller)");
+  std::cout << "input_profile=/interaction_profiles/meta/touch_plus_controller\n";
+  return test;
+}
+
+void attach_input_test(XrSession session, InputTest& test) {
+  if (!test.enabled) {
+    return;
+  }
+  const XrSessionActionSetsAttachInfo attach{
+      .type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO,
+      .next = nullptr,
+      .countActionSets = 1,
+      .actionSets = &test.action_set,
+  };
+  check(xrAttachSessionActionSets(session, &attach), "xrAttachSessionActionSets");
+  const XrActionSpaceCreateInfo space_info{
+      .type = XR_TYPE_ACTION_SPACE_CREATE_INFO,
+      .next = nullptr,
+      .action = test.pose_action,
+      .subactionPath = test.left_path,
+      .poseInActionSpace = identity_pose(),
+  };
+  check(xrCreateActionSpace(session, &space_info, &test.left_action_space),
+        "xrCreateActionSpace(left)");
+}
+
+[[nodiscard]] bool near(float actual, float expected) {
+  return std::abs(actual - expected) < 0.001F;
+}
+
+void verify_input_state(XrSession session, XrSpace local_space, XrTime time,
+                        const std::vector<XrView>& views, InputTest& test) {
+  if (!test.enabled) {
+    return;
+  }
+  if (views.size() >= 2 && near((views[0].pose.position.x + views[1].pose.position.x) * 0.5F, 1.0F) &&
+      near(views[0].pose.position.y, 2.0F) && near(views[0].pose.position.z, 3.0F)) {
+    test.views_verified = true;
+  }
+
+  const XrActiveActionSet active{.actionSet = test.action_set, .subactionPath = XR_NULL_PATH};
+  const XrActionsSyncInfo sync{.type = XR_TYPE_ACTIONS_SYNC_INFO,
+                               .next = nullptr,
+                               .countActiveActionSets = 1,
+                               .activeActionSets = &active};
+  if (XR_SUCCEEDED(xrSyncActions(session, &sync))) {
+    const XrActionStateGetInfo primary_info{.type = XR_TYPE_ACTION_STATE_GET_INFO,
+                                            .next = nullptr,
+                                            .action = test.primary_action,
+                                            .subactionPath = test.left_path};
+    XrActionStateBoolean primary{.type = XR_TYPE_ACTION_STATE_BOOLEAN, .next = nullptr};
+    const XrActionStateGetInfo trigger_info{.type = XR_TYPE_ACTION_STATE_GET_INFO,
+                                            .next = nullptr,
+                                            .action = test.trigger_action,
+                                            .subactionPath = test.left_path};
+    XrActionStateFloat trigger{.type = XR_TYPE_ACTION_STATE_FLOAT, .next = nullptr};
+    const XrActionStateGetInfo stick_info{.type = XR_TYPE_ACTION_STATE_GET_INFO,
+                                          .next = nullptr,
+                                          .action = test.thumbstick_action,
+                                          .subactionPath = test.left_path};
+    XrActionStateVector2f stick{.type = XR_TYPE_ACTION_STATE_VECTOR2F, .next = nullptr};
+    if (XR_SUCCEEDED(xrGetActionStateBoolean(session, &primary_info, &primary)) &&
+        XR_SUCCEEDED(xrGetActionStateFloat(session, &trigger_info, &trigger)) &&
+        XR_SUCCEEDED(xrGetActionStateVector2f(session, &stick_info, &stick)) &&
+        primary.isActive && primary.currentState && near(trigger.currentState, 0.75F) &&
+        near(stick.currentState.x, 0.25F) && near(stick.currentState.y, -0.5F)) {
+      test.actions_verified = true;
+    }
+  }
+
+  XrSpaceLocation location{.type = XR_TYPE_SPACE_LOCATION, .next = nullptr};
+  if (XR_SUCCEEDED(xrLocateSpace(test.left_action_space, local_space, time, &location)) &&
+      (location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
+      near(location.pose.position.x, -0.25F) && near(location.pose.position.y, 1.25F) &&
+      near(location.pose.position.z, -0.5F)) {
+    test.space_verified = true;
+  }
+}
+
 void poll_events(XrInstance instance, XrSession session, SessionState& state) {
   XrEventDataBuffer event{.type = XR_TYPE_EVENT_DATA_BUFFER, .next = nullptr};
   while (xrPollEvent(instance, &event) == XR_SUCCESS) {
@@ -92,6 +261,7 @@ void poll_events(XrInstance instance, XrSession session, SessionState& state) {
 
 int run(int argc, char** argv) {
   const int requested_frames = parse_frame_count(argc, argv);
+  const bool verify_input = std::getenv("MAQUESTLINK_VERIFY_INPUT") != nullptr;
 
   std::uint32_t extension_count{};
   check(xrEnumerateInstanceExtensionProperties(nullptr, 0, &extension_count, nullptr),
@@ -115,12 +285,14 @@ int run(int argc, char** argv) {
   std::strncpy(instance_info.applicationInfo.engineName, "MaQuestLink",
                XR_MAX_ENGINE_NAME_SIZE - 1);
   instance_info.applicationInfo.engineVersion = 1;
-  instance_info.applicationInfo.apiVersion = XR_MAKE_VERSION(1, 0, 0);
+  instance_info.applicationInfo.apiVersion = verify_input ? XR_MAKE_VERSION(1, 1, 0)
+                                                          : XR_MAKE_VERSION(1, 0, 0);
   instance_info.enabledExtensionCount = 1;
   instance_info.enabledExtensionNames = enabled_extensions;
 
   XrInstance instance{XR_NULL_HANDLE};
   check(xrCreateInstance(&instance_info, &instance), "xrCreateInstance");
+  InputTest input_test = create_input_test(instance, verify_input);
 
   XrInstanceProperties instance_properties{.type = XR_TYPE_INSTANCE_PROPERTIES, .next = nullptr};
   check(xrGetInstanceProperties(instance, &instance_properties), "xrGetInstanceProperties");
@@ -170,6 +342,7 @@ int run(int argc, char** argv) {
   };
   XrSession session{XR_NULL_HANDLE};
   check(xrCreateSession(instance, &session_info, &session), "xrCreateSession");
+  attach_input_test(session, input_test);
 
   std::uint32_t view_count{};
   check(xrEnumerateViewConfigurationViews(instance, system_id,
@@ -283,6 +456,7 @@ int run(int argc, char** argv) {
     check(xrLocateViews(session, &locate_info, &view_state, view_count, &located_view_count,
                         views.data()),
           "xrLocateViews");
+    verify_input_state(session, local_space, frame_state.predictedDisplayTime, views, input_test);
 
     std::vector<XrCompositionLayerProjectionView> projection_views;
     XrCompositionLayerProjection projection{
@@ -358,9 +532,22 @@ int run(int argc, char** argv) {
     ++rendered_frames;
   }
 
+  if (verify_input &&
+      (!input_test.views_verified || !input_test.actions_verified || !input_test.space_verified)) {
+    throw std::runtime_error("synthetic input was not observed through all OpenXR APIs");
+  }
+  if (verify_input) {
+    std::cout << "MAQUESTLINK_INPUT_E2E_OK views=1 actions=1 space=1\n";
+  }
+  if (input_test.left_action_space != XR_NULL_HANDLE) {
+    check(xrDestroySpace(input_test.left_action_space), "xrDestroySpace(action)");
+  }
   check(xrDestroySpace(local_space), "xrDestroySpace");
   check(xrDestroySwapchain(swapchain), "xrDestroySwapchain");
   check(xrDestroySession(session), "xrDestroySession");
+  if (input_test.action_set != XR_NULL_HANDLE) {
+    check(xrDestroyActionSet(input_test.action_set), "xrDestroyActionSet");
+  }
   check(xrDestroyInstance(instance), "xrDestroyInstance");
   std::cout << "MAQUESTLINK_FRAME_LOOP_OK frames=" << rendered_frames << '\n';
   return rendered_frames == requested_frames ? 0 : 1;

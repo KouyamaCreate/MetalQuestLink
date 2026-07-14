@@ -7,28 +7,22 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include <atomic>
 #include <array>
 #include <chrono>
 #include <cstdint>
-#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <iterator>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 
+#include "input_injection.hpp"
 #include "maquestlink/protocol.hpp"
 #include "streaming.hpp"
+#include "transport.hpp"
 
 namespace {
 
@@ -54,77 +48,6 @@ std::mutex g_state_mutex;
 std::map<XrInstance, InstanceData> g_instances;
 std::map<XrSession, SessionData> g_sessions;
 std::map<XrSwapchain, SwapchainData> g_swapchains;
-
-class TcpServer {
- public:
-  static TcpServer& instance() {
-    static TcpServer server;
-    return server;
-  }
-
-  void start() {
-    std::call_once(start_once_, [this] { std::thread([this] { accept_loop(); }).detach(); });
-  }
-
-  [[nodiscard]] bool connected() const { return client_.load() >= 0; }
-
-  void send_message(const protocol::Message& message) {
-    const auto bytes = protocol::serialize(message);
-    std::scoped_lock lock(send_mutex_);
-    const int fd = client_.load();
-    if (fd < 0) {
-      return;
-    }
-    std::size_t offset = 0;
-    while (offset < bytes.size()) {
-      const auto* data = reinterpret_cast<const char*>(bytes.data() + offset);
-      const ssize_t sent = ::send(fd, data, bytes.size() - offset, 0);
-      if (sent <= 0) {
-        ::close(fd);
-        client_.store(-1);
-        return;
-      }
-      offset += static_cast<std::size_t>(sent);
-    }
-  }
-
- private:
-  void accept_loop() {
-    const int server = ::socket(AF_INET, SOCK_STREAM, 0);
-    if (server < 0) {
-      return;
-    }
-    int reuse = 1;
-    (void)::setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-    sockaddr_in address{};
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    const char* port_value = std::getenv("MAQUESTLINK_PORT");
-    const int port = port_value == nullptr ? 42424 : std::atoi(port_value);
-    address.sin_port = htons(static_cast<std::uint16_t>(port));
-    if (::bind(server, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 ||
-        ::listen(server, 1) != 0) {
-      ::close(server);
-      return;
-    }
-    for (;;) {
-      const int accepted = ::accept(server, nullptr, nullptr);
-      if (accepted < 0) {
-        continue;
-      }
-      int no_sigpipe = 1;
-      (void)::setsockopt(accepted, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
-      const int old = client_.exchange(accepted);
-      if (old >= 0) {
-        ::close(old);
-      }
-    }
-  }
-
-  std::once_flag start_once_;
-  std::atomic<int> client_{-1};
-  std::mutex send_mutex_;
-};
 
 struct FrameMetadata {
   std::uint64_t sequence{};
@@ -220,7 +143,7 @@ void compression_callback(void*, void* source_ref, OSStatus status,
               << " avg_encode_ms=" << (static_cast<double>(total_encode) / frame_count / 1'000'000.0)
               << "\n";
   }
-  TcpServer::instance().send_message(protocol::Message{
+  transport_send(protocol::Message{
       .sequence = metadata->sequence,
       .payload = protocol::VideoFrame{
           .capture_timestamp_ns = metadata->timestamp_ns,
@@ -403,6 +326,7 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_create_session(XrInstance instance,
     }
     std::scoped_lock lock(g_state_mutex);
     g_sessions[*session] = SessionData{instance, queue};
+    input_register_session(*session, instance);
   }
   return result;
 }
@@ -418,6 +342,7 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_destroy_session(XrSession session) {
   const auto next = next_function<PFN_xrDestroySession>(instance, "xrDestroySession");
   const XrResult result = next == nullptr ? XR_ERROR_HANDLE_INVALID : next(session);
   if (XR_SUCCEEDED(result)) {
+    input_unregister_session(session);
     std::scoped_lock lock(g_state_mutex);
     g_sessions.erase(session);
   }
@@ -506,7 +431,7 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_end_frame(XrSession session, const XrFrameEn
     session_data = g_sessions[session];
     instance = session_data.instance;
   }
-  if (TcpServer::instance().connected() && session_data.command_queue != nullptr && info != nullptr) {
+  if (transport_connected() && session_data.command_queue != nullptr && info != nullptr) {
     const std::uint64_t capture_timestamp_ns = monotonic_now_ns();
     for (std::uint32_t layer_index = 0; layer_index < info->layerCount; ++layer_index) {
       const auto* base = info->layers[layer_index];
@@ -554,27 +479,31 @@ void streaming_register_instance(XrInstance instance, PFN_xrGetInstanceProcAddr 
     std::scoped_lock lock(g_state_mutex);
     g_instances[instance] = InstanceData{gipa};
   }
-  TcpServer::instance().start();
+  transport_start();
 }
 
 void streaming_unregister_instance(XrInstance instance) {
-  std::scoped_lock lock(g_state_mutex);
-  for (auto swapchain = g_swapchains.begin(); swapchain != g_swapchains.end();) {
-    const auto session = g_sessions.find(swapchain->second.session);
-    if (session != g_sessions.end() && session->second.instance == instance) {
-      swapchain = g_swapchains.erase(swapchain);
-    } else {
-      ++swapchain;
+  {
+    std::scoped_lock lock(g_state_mutex);
+    for (auto swapchain = g_swapchains.begin(); swapchain != g_swapchains.end();) {
+      const auto session = g_sessions.find(swapchain->second.session);
+      if (session != g_sessions.end() && session->second.instance == instance) {
+        swapchain = g_swapchains.erase(swapchain);
+      } else {
+        ++swapchain;
+      }
     }
-  }
-  for (auto session = g_sessions.begin(); session != g_sessions.end();) {
-    if (session->second.instance == instance) {
-      session = g_sessions.erase(session);
-    } else {
-      ++session;
+    for (auto session = g_sessions.begin(); session != g_sessions.end();) {
+      if (session->second.instance == instance) {
+        input_unregister_session(session->first);
+        session = g_sessions.erase(session);
+      } else {
+        ++session;
+      }
     }
+    g_instances.erase(instance);
   }
-  g_instances.erase(instance);
+  transport_stop();
 }
 
 bool streaming_get_proc_addr(const char* name, PFN_xrVoidFunction* function) {

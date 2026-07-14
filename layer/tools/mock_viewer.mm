@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -30,6 +31,7 @@ struct Options {
   int frames{120};
   double minimum_fps{30.0};
   int port{42424};
+  bool send_input{};
 };
 
 [[nodiscard]] Options parse_options(int argc, char** argv) {
@@ -41,6 +43,8 @@ struct Options {
       options.minimum_fps = std::stod(argv[++index]);
     } else if (std::strcmp(argv[index], "--port") == 0 && index + 1 < argc) {
       options.port = std::stoi(argv[++index]);
+    } else if (std::strcmp(argv[index], "--send-input") == 0) {
+      options.send_input = true;
     } else {
       throw std::runtime_error(std::string("unknown or incomplete option: ") + argv[index]);
     }
@@ -71,6 +75,8 @@ struct Options {
     address.sin_port = htons(static_cast<std::uint16_t>(port));
     address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
     if (::connect(socket_fd, reinterpret_cast<sockaddr*>(&address), sizeof(address)) == 0) {
+      int no_sigpipe = 1;
+      (void)::setsockopt(socket_fd, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
       timeval timeout{.tv_sec = 30, .tv_usec = 0};
       (void)::setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
       return socket_fd;
@@ -79,6 +85,50 @@ struct Options {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
   throw std::runtime_error("timed out connecting to MaQuestLink layer");
+}
+
+[[nodiscard]] protocol::Pose synthetic_pose(float x, float y, float z) {
+  return {
+      .position = {x, y, z},
+      .orientation = {0.0F, 0.0F, 0.0F, 1.0F},
+      .flags = protocol::PositionValid | protocol::OrientationValid |
+               protocol::PositionTracked | protocol::OrientationTracked,
+  };
+}
+
+void send_synthetic_input(std::stop_token stop, int socket_fd,
+                          std::atomic<std::uint64_t>& sent_count) {
+  while (!stop.stop_requested()) {
+    const std::uint64_t sequence = sent_count.load();
+    const protocol::Message message{
+        .sequence = sequence,
+        .payload = protocol::PoseInput{
+            .sample_timestamp_ns = monotonic_now_ns(),
+            .head = synthetic_pose(1.0F, 2.0F, 3.0F),
+            .left = {.pose = synthetic_pose(-0.25F, 1.25F, -0.5F),
+                     .buttons = protocol::PrimaryButton | protocol::ThumbstickButton,
+                     .thumbstick = {0.25F, -0.5F},
+                     .trigger = 0.75F,
+                     .grip = 0.5F},
+            .right = {.pose = synthetic_pose(0.25F, 1.25F, -0.5F),
+                      .buttons = protocol::SecondaryButton,
+                      .thumbstick = {-0.25F, 0.5F},
+                      .trigger = 0.25F,
+                      .grip = 1.0F},
+        },
+    };
+    const auto bytes = protocol::serialize(message);
+    std::size_t offset{};
+    while (offset < bytes.size() && !stop.stop_requested()) {
+      const ssize_t sent = ::send(socket_fd, bytes.data() + offset, bytes.size() - offset, 0);
+      if (sent <= 0) {
+        return;
+      }
+      offset += static_cast<std::size_t>(sent);
+    }
+    sent_count.fetch_add(1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(11));
+  }
 }
 
 void receive_exact(int socket_fd, std::span<std::byte> output) {
@@ -274,6 +324,14 @@ int run(int argc, char** argv) {
     ~SocketCloser() { ::close(fd); }
   } socket_closer{socket_fd};
 
+  std::atomic<std::uint64_t> sent_input{};
+  std::optional<std::jthread> input_thread;
+  if (options.send_input) {
+    input_thread.emplace([socket_fd, &sent_input](std::stop_token stop) {
+      send_synthetic_input(stop, socket_fd, sent_input);
+    });
+  }
+
   DecoderStats stats;
   H264Decoder decoder(stats);
   std::uint64_t received{};
@@ -305,8 +363,13 @@ int run(int argc, char** argv) {
   const double elapsed_seconds =
       static_cast<double>(stats.last_ns.load() - stats.first_ns.load()) / 1'000'000'000.0;
   const double fps = elapsed_seconds > 0.0 ? static_cast<double>(decoded - 1) / elapsed_seconds : 0.0;
+  if (input_thread.has_value()) {
+    input_thread->request_stop();
+    input_thread->join();
+  }
   std::cout << "MAQUESTLINK_VIDEO_E2E_OK received=" << received << " decoded=" << decoded
-            << " fps=" << fps << " width=" << width << " height=" << height << '\n';
+            << " fps=" << fps << " width=" << width << " height=" << height
+            << " input_sent=" << sent_input.load() << '\n';
   if (fps < options.minimum_fps) {
     throw std::runtime_error("decoded frame rate is below the required minimum");
   }

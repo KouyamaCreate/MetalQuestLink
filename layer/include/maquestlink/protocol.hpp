@@ -43,6 +43,17 @@ enum PoseFlags : std::uint32_t {
   OrientationTracked = 1U << 3U,
 };
 
+enum ControllerButtons : std::uint64_t {
+  PrimaryButton = 1ULL << 0U,
+  SecondaryButton = 1ULL << 1U,
+  ThumbstickButton = 1ULL << 2U,
+  MenuButton = 1ULL << 3U,
+  PrimaryTouch = 1ULL << 4U,
+  SecondaryTouch = 1ULL << 5U,
+  ThumbstickTouch = 1ULL << 6U,
+  TriggerTouch = 1ULL << 7U,
+};
+
 struct Pose {
   std::array<float, 3> position{};
   std::array<float, 4> orientation{0.0F, 0.0F, 0.0F, 1.0F};

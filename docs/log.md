@@ -72,3 +72,29 @@
 
 - Phase 3で同じTCP接続の受信側を追加し、Quest由来のpose/inputをOpenXRへ注入する。
 - Unity/OVRPlugin固有のswapchain構成はPhase 5で実測する。
+
+### Phase 3 変更
+
+- TCP transportを全二重化し、PoseInput受信、切断処理、instance lifecycleに連動したthread停止を追加した。
+- view/reference/action spaceとaction/bindingを追跡するOpenXR input injection hookを追加した。
+- protocol v1にclick 4種とcapacitive touch 4種のbutton bit semanticを定義した。
+- mock viewerに約90 Hzの合成入力送信を追加し、native testにview/space/action照合を追加した。
+- `scripts/test_phase3.sh` で映像と入力を同時検証できるようにした。
+
+### Phase 3 理由
+
+- Questクライアントより先に、実機から届く予定のpose/button/analog値をOpenXR applicationへ差し替えられることをヘッドセットなしで実証するため。
+
+### Phase 3 影響
+
+- `layer/include/maquestlink/protocol.hpp`
+- `layer/src/input_injection.*`、`layer/src/transport.*`
+- `layer/src/openxr_layer.cpp`、`layer/src/streaming.mm`
+- `layer/native-test/hello_xr_metal.mm`、`layer/tools/mock_viewer.mm`
+- `scripts/test_phase3.sh`
+- `README.md`、`docs/`
+
+### Phase 3 残り
+
+- Phase 4でQuest native/Unity側から実際のHMD/controller入力を60 Hz以上で送る。
+- OVRPlugin要求拡張一覧とUnity action bindingはPhase 5のEditor Play modeで実測する。

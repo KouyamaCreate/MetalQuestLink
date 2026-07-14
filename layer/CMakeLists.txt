@@ -27,8 +27,10 @@ endif()
 
 if(MAQUESTLINK_BUILD_OPENXR)
   add_library(maquestlink_openxr_layer MODULE
+    src/input_injection.cpp
     src/openxr_layer.cpp
     src/streaming.mm
+    src/transport.cpp
   )
   target_compile_features(maquestlink_openxr_layer PRIVATE cxx_std_20)
   target_compile_definitions(maquestlink_openxr_layer PRIVATE XR_USE_GRAPHICS_API_METAL)

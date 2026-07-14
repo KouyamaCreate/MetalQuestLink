@@ -66,3 +66,28 @@
 ### 現時点の制約
 
 - Phase 2の映像抽出は、左右眼が同じ2D-array swapchainにあり、BGRA8UnormまたはBGRA8Unorm_sRGBである構成を対象とする。Meta XR Simulator native E2Eではこの構成を実測確認した。Unity/OVRPluginの実際のswapchain構成はPhase 5で検証する。
+
+## 2026-07-15 — Phase 3 実測
+
+### Meta Touch Plus interaction profile
+
+- OpenXR 1.1へpromoteされた現行profile pathは `/interaction_profiles/meta/touch_plus_controller`。
+- OpenXR 1.0の `XR_META_touch_controller_plus` extensionが定義した旧pathは `/interaction_profiles/meta/touch_controller_plus`。promote時に語順が変更されている。
+- native testはOpenXR 1.1を要求し、現行pathへの左右grip pose、X/A click、trigger value、thumbstick binding suggestionに成功した。
+- Simulator logで左右 `/user/hand/*/interaction_profiles/meta/touch_plus_controller` へのinteraction profile changeを実測した。
+- componentはKhronos OpenXR-SDK 1.1.61の `specification/registry/xr.xml` と[OpenXR 1.1仕様](https://registry.khronos.org/OpenXR/specs/1.1-khr/html/xrspec.html)で確認した。
+
+### 合成入力E2E
+
+- 実行コマンド: `scripts/test_phase3.sh`。
+- mock clientはHMD `(1, 2, 3)`、左controller `(-0.25, 1.25, -0.5)`、Primary click、thumbstick `(0.25, -0.5)`、trigger `0.75`、grip `0.5`を送信した。
+- 最終runで138 PoseInput samplesを送信した。`xrLocateViews` の両眼center、`xrLocateSpace` の左action space、`xrGetActionStateBoolean` / `Float` / `Vector2f` の全合成値が一致した。
+- 同じconnectionで3360x1760 H.264をreceived 120 / decoded 120、76.4866 fpsで処理した。映像と入力の全二重動作を確認した。
+- `scripts/test_phase2.sh` も再実行し、viewer未接続60-frame pass-throughと映像120-frame decodeの回帰がないことを確認した。
+
+### 入力の安全側動作
+
+- connection切断時は最新入力を破棄する。connectionが残っていても最後の受信から500 msを超えたPoseInputは無効とし、Simulatorのruntime値をそのまま返す。
+- protocol v1はclick 4種に加えcapacitive touch 4種のbitを確保した。mock E2Eではclick/analogを検証し、Questからのtouch取得はPhase 4で実装する。
+- controller pose protocolは左右1 poseずつのため、grip poseとaim poseへ同じ値を返す。別poseが必要になった場合はprotocol拡張が必要。
+- `xrLocateViews` のeye offsetは現時点で固定IPD 64 mm。実機HMDから左右eye transformを送らないMVP仕様であり、Phase 6の再投影検証時に必要なら調整する。

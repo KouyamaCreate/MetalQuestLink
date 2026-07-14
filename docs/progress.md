@@ -7,7 +7,7 @@
 | 0 — リポジトリ基盤とプロトコル | 完了 | build成功、ctest 1/1成功、arm64確認 |
 | 1 — 技術検証スパイク | 完了 | clean build成功、Simulator Metal E2E 120 frames成功、layer load確認 |
 | 2 — 映像パイプライン | 完了 | H.264 decode 120/120・66.8345 fps、未接続60 frames完走 |
-| 3 — 入力パイプライン | 未着手 | — |
+| 3 — 入力パイプライン | 完了 | view/space/action合成入力E2E成功、PoseInput 138 samples |
 | 4 — Questクライアント | 未着手 | — |
 | 5 — Unityエディタ統合 | 未着手 | — |
 | 6 — 再投影・計測・ドキュメント | 未着手 | — |
@@ -62,3 +62,25 @@
   - producerは240-frame OpenXR loopを完走。120-frame時点で平均copy 4.02939 ms、平均encode 16.1017 ms。
   - viewer未接続の独立runは60-frame loopを完走し、映像処理を行わないpass-throughを確認。
 - 詳細な実測結果: `docs/notes.md` の「Phase 2」を参照。
+
+## Phase 3
+
+- 成果物:
+  - lifecycle管理された全二重TCP transportと最新PoseInput store
+  - `xrLocateViews` / `xrLocateSpace` のHMD・controller pose注入
+  - action set/action/subaction/binding mapping
+  - `xrSyncActions` / `xrGetActionStateBoolean` / `Float` / `Vector2f` / `Pose` hook
+  - click/touch/analogのprotocol v1 semantic定義
+  - 合成入力送信mock clientと `scripts/test_phase3.sh`
+- build/regression:
+  - `cmake --build build -j8`
+  - `ctest --test-dir build --output-on-failure`
+  - 結果: 成功。protocol test 1/1 passed。
+- input E2E: `scripts/test_phase3.sh`
+  - 結果: 成功。合成PoseInput 138 samplesを送信。
+  - `xrLocateViews`、`xrLocateSpace`、boolean/float/vector action stateの期待値一致をnative client内で確認。
+  - OpenXR 1.1の現行Touch Plus profile `/interaction_profiles/meta/touch_plus_controller` をSimulatorで有効化した。
+  - 同時映像は3360x1760 H.264を120/120 frames、76.4866 fpsでdecode。
+- Phase 2 regression: `scripts/test_phase2.sh`
+  - 結果: 成功。未接続pass-throughと接続映像decodeの両方を再確認。
+- 詳細な実測結果: `docs/notes.md` の「Phase 3」を参照。
