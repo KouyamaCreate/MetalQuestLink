@@ -246,3 +246,34 @@
 - `Window > MaQuestLink`へ`Passthrough preview`と`Show tracked hands`を追加した。
 
 理由: コントローラなしでも追跡結果を目視でき、既存Unity projectのPlayからAndroid build待ちなしで実機previewへ入れるようにするため。
+
+### 既存Unity projectのPlay表示修正
+
+- Editor packageの最低Unity versionを6000.2へ広げ、Standalone XR loader、Oculus Touch feature、Meta XR feature setを自動設定する。Android loaderは既存設定を保持する。
+- GUI起動のUnityでもMeta XR Simulator runtime JSONを検出して`XR_RUNTIME_JSON`へ設定し、不足時はPlayを明示的に止める。
+- Unity 6000.2.5f1 / OpenXR 1.15.1のParaSights実シーンが提出するRGBA8Unorm_sRGBの2D-array swapchainをMetal computeでBGRAへ変換する。
+- stream再接続後の最初の映像を強制keyframeにし、SPS/PPSなしの差分frameからdecoderが始まる問題を修正する。
+- ParaSights実シーンで3360x1760映像を60/60 frame、同一Play中の再接続でも30/30 frame VideoToolbox decodeした。Quest接続中にMac側`encodedFrames=427`、約18.5 fpsを確認した。
+
+理由: sample demoではなく、利用者の既存Unity sceneをAndroid buildなしのPlay操作でQuestへ即時previewできるようにするため。
+
+### Quest一人称projection表示
+
+- 2 m先の`OVROverlay` Quadを既定表示にする構成を廃止し、`XR_KHR_android_surface_swapchain`でMediaCodec出力SurfaceをOpenXR stereo projection layerへ直接提出するnative featureを追加した。
+- `xrEndFrame`で既存projectionを左右眼pose/FOVとside-by-side rectを持つ受信映像projectionへ差し替え、Passthroughなど他のcomposition layerは保持する。
+- Android native pluginをQuest APK build前にarm64 cross-buildし、16 KB page alignmentで同梱する。
+- Quest EditModeへ左右眼pose/FOV mapping testを追加し、device E2EはOpenXR初期化完了を待ってからproducerを開始してimmersive Surface生成を検証する。
+
+理由: world-fixed Quadでは映像が空間内の板に見え、VRの視野全体を覆う一人称体験にならないため。
+
+### 複数Unity project向けパッケージ互換性
+
+- Play前のproject checkを追加し、Unity version、Standalone OpenXR、Simulator runtime、native layer、port、bitrate、encode待ち上限を検証する。
+- Standalone OpenXR設定は既存XR loaderを削除せず、OpenXRを先頭へ移して他のloaderをfallbackとして保持する。Android設定は変更しない。
+- adb / APK / runtime JSONはproject root基準の相対pathにも対応し、複数Quest用serial、USB優先時のWi-Fi fallback hostを設定可能にした。
+- H.264 bitrateは左右眼解像度に応じて8〜40 Mbpsを自動選択し、1〜80 Mbpsへ上書きできる。非同期encode待ちを既定2 frameに制限し、超過時は遅延を積まずdropする。
+- 同一2D-array swapchainと左右別2D / 2D-array swapchainを扱い、BGRA8 / RGBA8に加えて10-bitとRGBA16Floatを8-bit BGRAへ変換する。
+- status / Editor windowへstream解像度とdropped frame数を追加した。adb outputは非同期読取へ変更し、timeout前のpipe EOF待ちを防いだ。
+- native testへ左右別swapchain modeを追加し、Phase 2回帰で通常arrayと左右別2Dをどちらも実decodeする。
+
+理由: Unity version、XR loader順、stereo rendering mode、render texture format、接続端末、解像度が異なる既存projectへ、個別改造なしでUPM packageを導入できる範囲を広げるため。

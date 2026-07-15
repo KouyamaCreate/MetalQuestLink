@@ -363,6 +363,8 @@ int run(int argc, char** argv) {
   const bool verify_device_input = std::getenv("MAQUESTLINK_VERIFY_DEVICE_INPUT") != nullptr;
   const bool verify_input = verify_synthetic_input || verify_device_input;
   const bool require_hands = std::getenv("MAQUESTLINK_REQUIRE_HANDS") != nullptr;
+  const bool per_eye_swapchains =
+      std::getenv("MAQUESTLINK_TEST_PER_EYE_SWAPCHAINS") != nullptr;
 
   std::uint32_t extension_count{};
   check(xrEnumerateInstanceExtensionProperties(nullptr, 0, &extension_count, nullptr),
@@ -510,7 +512,7 @@ int run(int argc, char** argv) {
     width = std::max(width, view.recommendedImageRectWidth);
     height = std::max(height, view.recommendedImageRectHeight);
   }
-  const XrSwapchainCreateInfo swapchain_info{
+  XrSwapchainCreateInfo swapchain_info{
       .type = XR_TYPE_SWAPCHAIN_CREATE_INFO,
       .next = nullptr,
       .createFlags = 0,
@@ -520,23 +522,30 @@ int run(int argc, char** argv) {
       .width = width,
       .height = height,
       .faceCount = 1,
-      .arraySize = view_count,
+      .arraySize = per_eye_swapchains ? 1U : view_count,
       .mipCount = 1,
   };
-  XrSwapchain swapchain{XR_NULL_HANDLE};
-  check(xrCreateSwapchain(session, &swapchain_info, &swapchain), "xrCreateSwapchain");
-
-  std::uint32_t image_count{};
-  check(xrEnumerateSwapchainImages(swapchain, 0, &image_count, nullptr),
-        "xrEnumerateSwapchainImages(count)");
-  std::vector<XrSwapchainImageMetalKHR> images(
-      image_count,
-      XrSwapchainImageMetalKHR{
-          .type = XR_TYPE_SWAPCHAIN_IMAGE_METAL_KHR, .next = nullptr, .texture = nullptr});
-  check(xrEnumerateSwapchainImages(
-            swapchain, image_count, &image_count,
-            reinterpret_cast<XrSwapchainImageBaseHeader*>(images.data())),
-        "xrEnumerateSwapchainImages(values)");
+  const std::uint32_t swapchain_count = per_eye_swapchains ? view_count : 1U;
+  std::vector<XrSwapchain> swapchains(swapchain_count, XR_NULL_HANDLE);
+  std::vector<std::vector<XrSwapchainImageMetalKHR>> swapchain_images(swapchain_count);
+  for (std::uint32_t index = 0; index < swapchain_count; ++index) {
+    check(xrCreateSwapchain(session, &swapchain_info, &swapchains[index]),
+          "xrCreateSwapchain");
+    std::uint32_t image_count{};
+    check(xrEnumerateSwapchainImages(swapchains[index], 0, &image_count, nullptr),
+          "xrEnumerateSwapchainImages(count)");
+    auto& images = swapchain_images[index];
+    images.assign(
+        image_count,
+        XrSwapchainImageMetalKHR{
+            .type = XR_TYPE_SWAPCHAIN_IMAGE_METAL_KHR, .next = nullptr, .texture = nullptr});
+    check(xrEnumerateSwapchainImages(
+              swapchains[index], image_count, &image_count,
+              reinterpret_cast<XrSwapchainImageBaseHeader*>(images.data())),
+          "xrEnumerateSwapchainImages(values)");
+  }
+  std::cout << "swapchain_mode=" << (per_eye_swapchains ? "per-eye" : "single-array")
+            << '\n';
 
   const XrReferenceSpaceCreateInfo space_info{
       .type = XR_TYPE_REFERENCE_SPACE_CREATE_INFO,
@@ -594,24 +603,30 @@ int run(int argc, char** argv) {
     std::uint32_t layer_count = 0;
 
     if (frame_state.shouldRender && located_view_count == view_count) {
-      std::uint32_t image_index{};
+      std::vector<std::uint32_t> image_indices(swapchain_count);
       const XrSwapchainImageAcquireInfo acquire_info{
           .type = XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO, .next = nullptr};
-      check(xrAcquireSwapchainImage(swapchain, &acquire_info, &image_index),
-            "xrAcquireSwapchainImage");
       const XrSwapchainImageWaitInfo image_wait_info{
           .type = XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO,
           .next = nullptr,
           .timeout = XR_INFINITE_DURATION,
       };
-      check(xrWaitSwapchainImage(swapchain, &image_wait_info), "xrWaitSwapchainImage");
+      for (std::uint32_t index = 0; index < swapchain_count; ++index) {
+        check(xrAcquireSwapchainImage(
+                  swapchains[index], &acquire_info, &image_indices[index]),
+              "xrAcquireSwapchainImage");
+        check(xrWaitSwapchainImage(swapchains[index], &image_wait_info),
+              "xrWaitSwapchainImage");
+      }
 
-      id<MTLTexture> texture = (__bridge id<MTLTexture>)images.at(image_index).texture;
       id<MTLCommandBuffer> command_buffer = [command_queue commandBuffer];
       for (std::uint32_t eye = 0; eye < view_count; ++eye) {
+        const std::uint32_t swapchain_index = per_eye_swapchains ? eye : 0U;
+        id<MTLTexture> texture = (__bridge id<MTLTexture>)
+            swapchain_images[swapchain_index].at(image_indices[swapchain_index]).texture;
         MTLRenderPassDescriptor* descriptor = [MTLRenderPassDescriptor renderPassDescriptor];
         descriptor.colorAttachments[0].texture = texture;
-        descriptor.colorAttachments[0].slice = eye;
+        descriptor.colorAttachments[0].slice = per_eye_swapchains ? 0U : eye;
         descriptor.colorAttachments[0].loadAction = MTLLoadActionClear;
         descriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
         descriptor.colorAttachments[0].clearColor =
@@ -626,7 +641,10 @@ int run(int argc, char** argv) {
 
       const XrSwapchainImageReleaseInfo release_info{
           .type = XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO, .next = nullptr};
-      check(xrReleaseSwapchainImage(swapchain, &release_info), "xrReleaseSwapchainImage");
+      for (const auto swapchain : swapchains) {
+        check(xrReleaseSwapchainImage(swapchain, &release_info),
+              "xrReleaseSwapchainImage");
+      }
 
       projection_views.reserve(view_count);
       for (std::uint32_t eye = 0; eye < view_count; ++eye) {
@@ -635,11 +653,11 @@ int run(int argc, char** argv) {
             .next = nullptr,
             .pose = views[eye].pose,
             .fov = views[eye].fov,
-            .subImage = {.swapchain = swapchain,
+            .subImage = {.swapchain = swapchains[per_eye_swapchains ? eye : 0U],
                          .imageRect = {.offset = {.x = 0, .y = 0},
                                        .extent = {.width = static_cast<std::int32_t>(width),
                                                   .height = static_cast<std::int32_t>(height)}},
-                         .imageArrayIndex = eye},
+                         .imageArrayIndex = per_eye_swapchains ? 0U : eye},
         });
       }
       projection.space = local_space;
@@ -688,7 +706,9 @@ int run(int argc, char** argv) {
     check(xrDestroySpace(input_test.left_action_space), "xrDestroySpace(action)");
   }
   check(xrDestroySpace(local_space), "xrDestroySpace");
-  check(xrDestroySwapchain(swapchain), "xrDestroySwapchain");
+  for (const auto swapchain : swapchains) {
+    check(xrDestroySwapchain(swapchain), "xrDestroySwapchain");
+  }
   check(xrDestroySession(session), "xrDestroySession");
   if (input_test.action_set != XR_NULL_HANDLE) {
     check(xrDestroyActionSet(input_test.action_set), "xrDestroyActionSet");

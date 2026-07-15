@@ -28,9 +28,9 @@
 ### 映像ストリーミング
 
 - layerは `xrCreateSession`、swapchainの作成・image列挙・acquireと `xrEndFrame` を横取りし、Metal command queueと提出textureを追跡する。
-- client接続中だけ、左右眼のprojection image rectをIOSurface-backed BGRA pixel bufferへside-by-sideでMetal blitする。
+- client接続中だけ、左右眼のprojection image rectをIOSurface-backed BGRA pixel bufferへside-by-sideでコピーする。同一2D-array swapchainと左右別2D / 2D-array swapchainを扱う。BGRA8はMetal blit、それ以外のRGBA8、RGB10A2、BGR10A2、BGR10_XR、RGBA16Float対応formatはMetal computeで8-bit BGRAへ変換する。
 - `xrEndFrame` 進入時のhost monotonic timestampと、左右 `XrCompositionLayerProjectionView` のpose/FOVを各 `VideoFrame` に格納する。
-- VideoToolbox H.264 encoderはreal-time、frame reorder無効、Main profile、20 Mbps、60-frame key interval。出力はSPS/PPS付きAnnex B。
+- VideoToolbox H.264 encoderはreal-time、frame reorder無効、Main profile、60-frame key interval。bitrate既定値は左右眼合計pixel数に比例する8〜40 Mbps（3360x1760で20 Mbps）で、1〜80 Mbpsの固定値へ上書きできる。非同期encode待ちは既定2 frame（1〜8へ変更可能）に制限し、超過時は遅延を積まずframeをdropする。出力はSPS/PPS付きAnnex B。TCP再接続後の最初の映像は強制keyframeとし、decoderがGOP途中から開始しないようにする。
 - TCP serverはUSBのadb reverseとWi-Fi直結の両方に対応するため、既定で `0.0.0.0:42424` をlistenする。`MAQUESTLINK_PORT` で変更できる。mock clientはloopbackで接続する。切断後は即座にコピー・エンコードを止めてpass-throughへ戻る。
 - `maquestlink_mock_viewer` はprotocol受信、Annex B解析、VideoToolbox decode、metadata検証、decode fps集計を行う。
 - `scripts/test_phase2.sh` は未接続60-frame pass-throughと、接続240-frame producer / 120-frame decoderの両方を検証する。
@@ -53,7 +53,7 @@
 - `quest-client/` はUnity 6000.3.6f1、Meta XR Core SDK 203.0.0、Unity Meta OpenXR 2.5.1を使うAndroid OpenXR project。
 - MediaCodecへAnnex B access unitを投入し、Meta `OVROverlay` のcompositor-managed External Surfaceへ直接出力する。SBS映像の左右halfを各eyeへ割り当てる。
 - MediaCodecはlow-latency modeを先に試し、未対応端末では通常modeへfallbackする。H.264とHEVCのprotocol codecに対応する。
-- MVP画面はhead-fixedの3.2 m幅Quad。`OVRCameraRig` / `OVRManager`を持つgenerated sceneをCLI build時に生成する。
+- Quest 3 / 3Sでは`XR_KHR_android_surface_swapchain`でMediaCodec出力先を作り、side-by-side映像を左右の`XrCompositionLayerProjectionView`へ直接提出する。必要な拡張が使えない場合だけ3.2 m幅の`OVROverlay` Quadへfallbackする。`OVRCameraRig` / `OVRManager`を持つgenerated sceneをCLI build時に生成する。
 - HMDと左右controllerをUnity XR inputから毎Update取得し、OpenXR座標へ変換して最新PoseInputを送る。72 fpsを要求し、transportはbacklogを作らず最新sampleだけを送信する。
 - Unity XR HandsのHand Tracking SubsystemをAndroidで型指定して有効化する。同一feature IDを持つMicrosoft Hand Interaction Profileは使わない。追跡中の左右26関節をOpenXR順へ写し、PoseInputと同じ最新値優先transportで送る。
 - hand visualization指定時は受信側にcollider不要のprocedural joint sphere / bone cylinderを生成し、左手を緑、右手を青で表示する。追跡無効時は該当手を隠す。
@@ -66,22 +66,24 @@
 
 ### Unityエディタ統合
 
-- `editor-package/` はlocal UPM package `com.maquestlink.editor`。Unity起動時とPlay開始直前にlayer manifestを `$HOME/.local/share/openxr/1/api_layers/implicit.d` へ登録する。
-- Play開始直前に `MAQUESTLINK_ENABLE_API_LAYER`、port、layer log、status JSONの環境変数を設定する。ADB deviceがあれば `adb reverse` を設定し、既定ではインストール済みQuest clientをPassthrough / hand visualization指定付きで起動する。Play時にAPK buildは行わない。
-- `Window > MaQuestLink` はQuest接続状態、fps、平均Metal copy / VideoToolbox encode合計時間、encoded frame数を表示する。layer登録、APK install、adb reverse、client起動を手動でも実行できる。
-- native layerは `MAQUESTLINK_STATUS_FILE` 指定時、connection、encoded frames、fps、平均copy / encode / pipeline msを1秒周期でatomic JSON更新する。
+- `editor-package/` はUnity 6000.2以降向けlocal UPM package `com.maquestlink.editor`。Unity起動時とPlay開始直前にlayer manifestを `$HOME/.local/share/openxr/1/api_layers/implicit.d` へ登録する。
+- Play開始直前にUnity version、Standalone OpenXR、Simulator runtime、native layer、port、bitrate、pending上限をpreflightする。エラー時はPlayを止め、設定windowに理由を表示する。
+- Standaloneの自動設定はOpenXRを先頭loaderにし、既存loaderをfallbackとして保持する。Android側のloader / featureは変更しない。利用者指定pathは絶対pathまたはUnity project root基準の相対pathとして解決する。
+- Play開始直前に `MAQUESTLINK_ENABLE_API_LAYER`、port、bitrate、pending frame上限、layer log、status JSONの環境変数を設定する。ADB deviceがあればserial指定付きで `adb reverse` を設定し、既定ではインストール済みQuest clientをPassthrough / hand visualization / Wi-Fi fallback指定付きの分離processで起動する。Play時にAPK buildは行わない。
+- `Window > MaQuestLink` はQuest接続状態、fps、平均Metal copy / VideoToolbox encode合計時間、encoded / dropped frame数、stream解像度を表示する。layer登録、project check、APK install、adb reverse、client起動を手動でも実行できる。
+- native layerは `MAQUESTLINK_STATUS_FILE` 指定時、connection、encoded / dropped frames、stream寸法、fps、平均copy / encode / pipeline msを1秒周期でatomic JSON更新する。
 - `samples/MetaXRMinimal/` はUnity 6000.3 project。Meta XR Core SDK 203.0.0の`OVRCameraRig`、左右Touch controllerの`OVRGrabber`、`OVRGrabbable` cubeを生成する。
 - `scripts/test_phase5.sh` はsample生成、package manifest EditMode test、Meta XR Simulator上のPlayMode testを実行し、Unity applicationへのlayer loadと未接続待ち状態を検証する。PlayMode runはMetal graphics deviceが必要なため`-nographics`を使わない。
 
 ### 再投影とレイテンシ計測
 
-- Quest clientはVideoFrameの左右render poseを平均してrender head poseを復元する。OpenXR右手座標からUnity左手座標へposition `(x,y,-z)`、orientation `(-x,-y,z,w)` で変換する。
-- `OVROverlay` Quadはrender head poseの2 m前へworld配置する。新しいVideoFrameごとにのみposeを更新し、その後のhead motionはQuest compositorのworld-space reprojectionへ任せる。world-fixedが既定で、pose valid flag不足時は既存head-fixed配置を維持する。
+- Quest clientのnative OpenXR featureは`xrEndFrame`をchain hookし、Unityが提出するprojection layerを受信映像用projection layerへ差し替える。VideoFrameの左右render pose/FOVを座標変換せず各眼へ渡し、side-by-side swapchainの左半分／右半分を対応づける。その後のhead motionはQuest compositorの再投影へ任せる。
+- Passthrough時は他のcomposition layerを保持したままprojectionへsource-alphaと固定alpha 0.82を適用する。Android Surface拡張が無効な場合だけ、左右render poseの平均から2 m先のworld-fixed Quadを配置するfallbackを使う。
 - Quest clientは1秒周期でclient monotonic timestampを持つControl Pingを送る。Mac layerは受信host monotonic timestampと元client timestampを持つPongを即時返信する。
 - QuestはPing送信/受信の中央時刻とhost受信時刻から`host - client` offsetを推定する。このoffsetでMac capture timestampをQuest clockへ写し、capture→TCP受信とcapture→MediaCodec output Surface releaseを計測する。
 - `MAQUESTLINK_DIAGNOSTIC` は`reprojection`、`clock_synced`、`clock_rtt_ms`、`capture_to_receive_ms`、`capture_to_decode_ms`を含む。未同期値は`-1`。
-- Mac layer statusはschema `version: 1`とconnection、copy、encode、合計pipeline msを安定した`Library/MaQuestLink/status.json`へ出す。Quest側decode値はSurface releaseまでであり、光学的motion-to-photonではない。
-- `scripts/e2e_device.sh` は既存fps / pose Hzに加え、world-fixed、clock sync、capture-to-decode値を判定する。
+- Mac layer statusはschema `version: 1`とconnection、encoded / dropped frame、stream寸法、copy、encode、合計pipeline msを安定した`Library/MaQuestLink/status.json`へ出す。Quest側decode値はSurface releaseまでであり、光学的motion-to-photonではない。
+- `scripts/e2e_device.sh` はQuestのOpenXR初期化完了後に有限producerを開始し、既存fps / pose Hzに加え、immersive projection Surface生成、clock sync、capture-to-decode値を判定する。
 
 ### 配布package
 
@@ -103,3 +105,4 @@
 
 - シーンアンカー、空間メッシュ、アイ／フェイストラッキング。
 - パススルー映像の画素alpha、black key、premultiplied alpha、HEVC with alpha。
+- Play中のeye texture解像度／codec変更に伴うQuest MediaCodec Surfaceの動的再構成。

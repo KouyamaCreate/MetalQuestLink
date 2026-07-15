@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "displayName": "MaQuestLink Editor",
   "description": "Editor setup and diagnostics for streaming Meta XR Simulator play mode to Quest.",
-  "unity": "6000.3",
+  "unity": "6000.2",
+  "dependencies": {
+    "com.unity.xr.management": "4.5.1",
+    "com.unity.xr.openxr": "1.15.1"
+  },
   "author": {
     "name": "MaQuestLink"
   }

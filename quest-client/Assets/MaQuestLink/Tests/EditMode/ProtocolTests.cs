@@ -113,6 +113,46 @@ namespace MaQuestLink.QuestClient.Tests
         }
 
         [Test]
+        public void ImmersiveProjection_PreservesBothEyePosesAndFovs()
+        {
+            var frame = new VideoFrame();
+            frame.RenderViews[0] = new EyeView
+            {
+                Pose = new PoseState
+                {
+                    Position = new Vector3f { X = -0.032f, Y = 1.7f, Z = -0.2f },
+                    Orientation = new Quaternionf { X = 0.1f, Y = 0.2f, Z = 0.3f, W = 0.9f },
+                    Flags = PoseFlags.PositionValid | PoseFlags.OrientationValid,
+                },
+                Fov = new FieldOfView
+                {
+                    AngleLeft = -0.9f, AngleRight = 0.7f, AngleUp = 0.8f, AngleDown = -0.75f,
+                },
+            };
+            frame.RenderViews[1] = new EyeView
+            {
+                Pose = new PoseState
+                {
+                    Position = new Vector3f { X = 0.032f, Y = 1.7f, Z = -0.2f },
+                    Orientation = new Quaternionf { W = 1.0f },
+                    Flags = PoseFlags.PositionValid | PoseFlags.OrientationValid,
+                },
+                Fov = new FieldOfView
+                {
+                    AngleLeft = -0.7f, AngleRight = 0.9f, AngleUp = 0.81f, AngleDown = -0.76f,
+                },
+            };
+
+            Assert.IsTrue(ImmersiveProjectionFeature.TryBuildViews(frame, out var views));
+            Assert.That(views, Has.Length.EqualTo(2));
+            Assert.That(views[0].PositionX, Is.EqualTo(-0.032f));
+            Assert.That(views[0].OrientationW, Is.EqualTo(0.9f));
+            Assert.That(views[0].AngleLeft, Is.EqualTo(-0.9f));
+            Assert.That(views[1].PositionX, Is.EqualTo(0.032f));
+            Assert.That(views[1].AngleRight, Is.EqualTo(0.9f));
+        }
+
+        [Test]
         public void HandVisualizer_CountsOnlyActiveValidJoints()
         {
             var hands = CreateHands();

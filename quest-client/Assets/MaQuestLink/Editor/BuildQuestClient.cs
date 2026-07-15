@@ -105,6 +105,7 @@ namespace MaQuestLink.QuestClient.Editor
                 "com.unity.openxr.feature.input.oculustouch",
                 "com.unity.openxr.feature.input.metaquestplus",
                 "com.unity.openxr.feature.compositionlayers",
+                ImmersiveProjectionFeature.FeatureId,
             };
             foreach (var featureId in requiredFeatureIds)
             {

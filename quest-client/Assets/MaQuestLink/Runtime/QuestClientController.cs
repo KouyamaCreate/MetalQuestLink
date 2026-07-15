@@ -137,7 +137,7 @@ namespace MaQuestLink.QuestClient
                 pose_hz = sent - previousSent,
                 dropped = transport.DroppedFrames,
                 low_latency = decoder.LowLatencyRequested,
-                reprojection = ResolvePresenter() && presenter.WorldFixed ? "world_fixed" : "unavailable",
+                reprojection = ResolvePresenter() ? presenter.ProjectionMode : "unavailable",
                 clock_synced = transport.HasClockSync,
                 clock_rtt_ms = transport.ClockRoundTripMs,
                 capture_to_receive_ms = captureToReceiveMs,

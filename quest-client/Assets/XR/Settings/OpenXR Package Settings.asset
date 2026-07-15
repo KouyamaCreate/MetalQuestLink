@@ -1763,6 +1763,26 @@ MonoBehaviour:
   company: Unity
   priority: 0
   required: 0
+--- !u!114 &7859506150069760227
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f7a813e745f4f3aa54f83153416c835, type: 3}
+  m_Name: ImmersiveProjectionFeature Android
+  m_EditorClassIdentifier: MaQuestLink.QuestClient::MaQuestLink.QuestClient.ImmersiveProjectionFeature
+  m_enabled: 1
+  nameUi: MaQuestLink Immersive Projection
+  version: 0.1.0
+  featureIdInternal: com.maquestlink.openxr.feature.immersiveprojection
+  openxrExtensionStrings: XR_KHR_android_surface_swapchain XR_KHR_composition_layer_color_scale_bias
+  company: MaQuestLink
+  priority: 0
+  required: 0
 --- !u!114 &8196745176103030070
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1882,6 +1902,7 @@ MonoBehaviour:
   - {fileID: -7465893580016127777}
   - {fileID: 4999568698142958828}
   - {fileID: 7294644489008372909}
+  - {fileID: 7859506150069760227}
   - {fileID: -3139615283051569475}
   - {fileID: 524803391249031993}
   - {fileID: -230958318631343534}

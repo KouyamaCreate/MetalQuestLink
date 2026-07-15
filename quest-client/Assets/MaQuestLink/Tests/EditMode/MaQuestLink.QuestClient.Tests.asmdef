@@ -2,7 +2,8 @@
   "name": "MaQuestLink.QuestClient.Tests",
   "rootNamespace": "MaQuestLink.QuestClient.Tests",
   "references": [
-    "MaQuestLink.QuestClient"
+    "MaQuestLink.QuestClient",
+    "Unity.XR.OpenXR"
   ],
   "includePlatforms": [
     "Editor"

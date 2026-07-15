@@ -15,8 +15,16 @@ namespace MaQuestLink.Editor
 
         private static void RegisterLayerOnLoad()
         {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+            {
+                return;
+            }
             try
             {
+                if (MaQuestLinkSettings.instance.autoConfigureStandaloneOpenXR)
+                {
+                    StandaloneOpenXRConfigurator.Configure();
+                }
                 var manifest = OpenXRLayerInstaller.RegisterLayer();
                 Debug.Log($"MAQUESTLINK_LAYER_REGISTERED manifest={manifest}");
             }
@@ -34,12 +42,23 @@ namespace MaQuestLink.Editor
             }
             try
             {
+                var preflight = MaQuestLinkPreflight.Evaluate();
+                if (!preflight.IsReady)
+                {
+                    EditorApplication.isPlaying = false;
+                    Debug.LogError("MAQUESTLINK_PLAY_BLOCKED " + preflight.ToMultilineString());
+                    return;
+                }
                 var manifest = OpenXRLayerInstaller.RegisterLayer();
                 var settings = MaQuestLinkSettings.instance;
-                var adb = settings.autoStartQuestClient ? AdbBridge.StartClient() : AdbBridge.Reverse();
+                var adb = settings.autoStartQuestClient
+                    ? AdbBridge.StartClientDetached()
+                    : AdbBridge.Reverse();
                 Debug.Log($"MAQUESTLINK_PLAY_READY manifest={manifest} adbReady={adb.Success} " +
-                          $"questClientStarted={settings.autoStartQuestClient && adb.Success} " +
+                          $"questClientStarted={(settings.autoStartQuestClient && adb.Success ? "scheduled" : "false")} " +
                           $"passthrough={settings.enablePassthroughPreview} hands={settings.showTrackedHands} " +
+                          $"bitrateMbps={(settings.bitrateMbps == 0 ? "auto" : settings.bitrateMbps.ToString())} " +
+                          $"maxPendingFrames={settings.maxPendingFrames} " +
                           $"status=waiting_for_connection port={MaQuestLinkSettings.instance.port}");
                 if (!adb.Success)
                 {

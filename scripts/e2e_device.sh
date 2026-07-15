@@ -78,6 +78,21 @@ LOGCAT_PID="$!"
   --es maquestlink_host 127.0.0.1 \
   --ei maquestlink_port "$PORT"
 
+# Quest OS can spend tens of seconds initializing OpenXR after a fresh APK install.
+# Wait for the client Update loop before starting the finite native producer.
+CLIENT_READY=0
+for _ in $(seq 1 90); do
+  if rg -q 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG"; then
+    CLIENT_READY=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$CLIENT_READY" -ne 1 ]]; then
+  echo "Quest client did not finish OpenXR initialization within 90 seconds. Keep the headset awake and worn. See: $LOGCAT_LOG" >&2
+  exit 1
+fi
+
 PRODUCER_ENV=(
   "MAQUESTLINK_PORT=$PORT"
   "MAQUESTLINK_VERIFY_DEVICE_INPUT=1"
@@ -122,9 +137,13 @@ if (( MAX_RECEIVE < 30 || MAX_DECODE < 30 || MAX_POSE < 60 )); then
   echo "Phase 4 device E2E failed: received_fps=$MAX_RECEIVE decode_fps=$MAX_DECODE pose_hz=$MAX_POSE" >&2
   exit 1
 fi
-if ! rg -q 'MAQUESTLINK_DIAGNOSTIC.*"reprojection":"world_fixed".*"clock_synced":true' "$LOGCAT_LOG" || \
+if ! rg -q 'MAQUESTLINK_DIAGNOSTIC.*"reprojection":"immersive_projection".*"clock_synced":true' "$LOGCAT_LOG" || \
    [[ -z "$LAST_LATENCY" ]]; then
-  echo "Phase 6 device E2E failed: world-fixed reprojection or synchronized latency was not reported" >&2
+  echo "Phase 6 device E2E failed: immersive projection or synchronized latency was not reported" >&2
+  exit 1
+fi
+if ! rg -q 'MaQuestLinkProjection.*created immersive Android Surface projection swapchain' "$LOGCAT_LOG"; then
+  echo "Quest immersive projection surface was not created. See: $LOGCAT_LOG" >&2
   exit 1
 fi
 if (( MAX_HANDS < 1 || MAX_HAPTICS < 1 )) || \

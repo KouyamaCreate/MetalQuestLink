@@ -14,6 +14,14 @@
 | 7 — 配布パッケージング | 完了 | 配布4点・checksum・repository外tarball Unity/Simulator E2E・doctor成功 |
 | 8 — Quest機能の拡張対応 | 完了 | haptic / hand / passthrough mock E2E、Quest EditMode 9/9、Phase 0〜7回帰、Quest 3実機E2E成功 |
 
+## Phase完了後の汎用パッケージ化
+
+- Quest 3装着時に一人称projection、左右52関節のhand model開閉、Passthrough underlayを目視確認した。
+- Unity 6000.2 / 6000.3のproject差をpreflightし、既存Standalone XR loaderを保持したOpenXR先頭化、project相対path、Quest serial / Wi-Fi fallbackを追加した。
+- stream解像度に応じたauto bitrate、encode待ち上限とframe drop、statusのdrop / 解像度表示を追加した。
+- Single Pass相当の同一2D-arrayとMulti Pass相当の左右別2D swapchainをどちらもH.264 decode E2Eで検証する。
+- 最終検証はQuest EditMode 12/12、Editor 9/9、PlayMode 1/1、release checksum、repository外tarball E2E、doctor error 0まで成功。最後のdevice再実行だけ未装着でscreen OFFとなりOpenXR初期化待ちがtimeoutしたが、それ以前の自動実機E2Eと一人称表示・hand・Passthroughの装着目視は成功済み。
+
 ## Phase 0
 
 - 成果物: CMakeスキャフォールド、共有バイナリプロトコル、単体テスト

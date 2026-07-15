@@ -10,6 +10,9 @@ namespace MaQuestLink.Editor
         public int version;
         public bool connected;
         public ulong encodedFrames;
+        public ulong droppedFrames;
+        public int streamWidth;
+        public int streamHeight;
         public float fps;
         public float averageCopyMs;
         public float averageEncodeMs;

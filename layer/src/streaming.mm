@@ -8,6 +8,7 @@
 #include <openxr/openxr_platform.h>
 
 #include <atomic>
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -71,11 +72,63 @@ struct FrameMetadata {
 }
 
 std::atomic<std::uint64_t> g_encoded_frames{};
+std::atomic<std::uint64_t> g_dropped_frames{};
+std::atomic<std::uint64_t> g_pending_encodes{};
+std::atomic<std::uint32_t> g_stream_width{};
+std::atomic<std::uint32_t> g_stream_height{};
 std::atomic<std::uint64_t> g_total_copy_ns{};
 std::atomic<std::uint64_t> g_total_encode_ns{};
+std::atomic<bool> g_logged_frame_layout{};
+std::atomic<std::uint64_t> g_end_frame_calls{};
+std::atomic<std::uint64_t> g_nonempty_end_frames{};
+std::atomic<bool> g_transport_was_connected{};
 std::mutex g_status_mutex;
 std::uint64_t g_last_status_ns{};
 std::uint64_t g_last_status_frames{};
+
+[[nodiscard]] bool supported_stream_format(MTLPixelFormat format) {
+  switch (format) {
+    case MTLPixelFormatBGRA8Unorm:
+    case MTLPixelFormatBGRA8Unorm_sRGB:
+    case MTLPixelFormatRGBA8Unorm:
+    case MTLPixelFormatRGBA8Unorm_sRGB:
+    case MTLPixelFormatRGB10A2Unorm:
+    case MTLPixelFormatBGR10A2Unorm:
+    case MTLPixelFormatBGR10_XR:
+    case MTLPixelFormatBGR10_XR_sRGB:
+    case MTLPixelFormatRGBA16Float:
+      return true;
+    default:
+      return false;
+  }
+}
+
+[[nodiscard]] bool requires_compute_copy(MTLPixelFormat format) {
+  return format != MTLPixelFormatBGRA8Unorm && format != MTLPixelFormatBGRA8Unorm_sRGB;
+}
+
+[[nodiscard]] bool is_srgb_format(MTLPixelFormat format) {
+  return format == MTLPixelFormatRGBA8Unorm_sRGB ||
+         format == MTLPixelFormatBGR10_XR_sRGB;
+}
+
+[[nodiscard]] std::uint32_t environment_uint(const char* name, std::uint32_t fallback,
+                                             std::uint32_t minimum, std::uint32_t maximum) {
+  const char* value = std::getenv(name);
+  if (value == nullptr || *value == '\0') return fallback;
+  char* end{};
+  const unsigned long parsed = std::strtoul(value, &end, 10);
+  if (end == value || *end != '\0' || parsed < minimum || parsed > maximum) return fallback;
+  return static_cast<std::uint32_t>(parsed);
+}
+
+void log_streaming_line(const std::string& message) {
+  std::cerr << "[MaQuestLink streaming] " << message << '\n';
+  if (const char* path = std::getenv("MAQUESTLINK_LAYER_LOG"); path != nullptr && path[0] != '\0') {
+    std::ofstream stream(path, std::ios::app);
+    stream << message << '\n';
+  }
+}
 
 void write_status(bool force = false) {
   const char* status_path = std::getenv("MAQUESTLINK_STATUS_FILE");
@@ -113,6 +166,9 @@ void write_status(bool force = false) {
          << "  \"version\": 1,\n"
          << "  \"connected\": " << (transport_connected() ? "true" : "false") << ",\n"
          << "  \"encodedFrames\": " << frames << ",\n"
+         << "  \"droppedFrames\": " << g_dropped_frames.load() << ",\n"
+         << "  \"streamWidth\": " << g_stream_width.load() << ",\n"
+         << "  \"streamHeight\": " << g_stream_height.load() << ",\n"
          << "  \"fps\": " << fps << ",\n"
          << "  \"averageCopyMs\": " << average_copy_ms << ",\n"
          << "  \"averageEncodeMs\": " << average_encode_ms << ",\n"
@@ -174,9 +230,12 @@ void write_status(bool force = false) {
 }
 
 void compression_callback(void*, void* source_ref, OSStatus status,
-                          VTEncodeInfoFlags, CMSampleBufferRef sample) {
+                          VTEncodeInfoFlags flags, CMSampleBufferRef sample) {
   std::unique_ptr<FrameMetadata> metadata(static_cast<FrameMetadata*>(source_ref));
-  if (status != noErr || sample == nullptr || !CMSampleBufferDataIsReady(sample)) {
+  g_pending_encodes.fetch_sub(1);
+  if (status != noErr || (flags & kVTEncodeInfo_FrameDropped) != 0 || sample == nullptr ||
+      !CMSampleBufferDataIsReady(sample)) {
+    g_dropped_frames.fetch_add(1);
     return;
   }
   bool keyframe = true;
@@ -221,6 +280,7 @@ class VideoEncoder {
  public:
   ~VideoEncoder() {
     if (session_ != nullptr) {
+      VTCompressionSessionCompleteFrames(session_, kCMTimeInvalid);
       VTCompressionSessionInvalidate(session_);
       CFRelease(session_);
     }
@@ -229,11 +289,21 @@ class VideoEncoder {
     }
   }
 
-  void encode(id<MTLCommandQueue> queue, id<MTLTexture> source, std::uint32_t width,
+  void encode(id<MTLCommandQueue> queue, const std::array<id<MTLTexture>, 2>& sources,
+              std::uint32_t width,
               std::uint32_t height, const XrCompositionLayerProjectionView* views,
-              std::uint64_t capture_timestamp_ns, bool passthrough) {
+              std::uint64_t capture_timestamp_ns, bool passthrough, bool force_keyframe) {
     std::scoped_lock lock(mutex_);
-    if (!ensure(queue.device, width * 2, height)) {
+    const std::uint32_t max_pending =
+        environment_uint("MAQUESTLINK_MAX_PENDING_FRAMES", 2, 1, 8);
+    if (g_pending_encodes.load() >= max_pending) {
+      g_dropped_frames.fetch_add(1);
+      return;
+    }
+    const bool compute_source = std::any_of(sources.begin(), sources.end(), [](id<MTLTexture> source) {
+      return requires_compute_copy(source.pixelFormat);
+    });
+    if (!ensure(queue.device, width * 2, height, compute_source)) {
       return;
     }
     CVPixelBufferRef pixel{};
@@ -252,21 +322,68 @@ class VideoEncoder {
     }
     id<MTLTexture> destination = CVMetalTextureGetTexture(cv_texture);
     id<MTLCommandBuffer> command = [queue commandBuffer];
-    id<MTLBlitCommandEncoder> blit = [command blitCommandEncoder];
     const MTLSize size = MTLSizeMake(width, height, 1);
-    for (std::uint32_t eye = 0; eye < 2; ++eye) {
-      [blit copyFromTexture:source
-                sourceSlice:views[eye].subImage.imageArrayIndex
-                sourceLevel:0
-               sourceOrigin:MTLOriginMake(views[eye].subImage.imageRect.offset.x,
-                                          views[eye].subImage.imageRect.offset.y, 0)
-                 sourceSize:size
-                  toTexture:destination
-           destinationSlice:0
-           destinationLevel:0
-          destinationOrigin:MTLOriginMake(width * eye, 0, 0)];
+    if (compute_source) {
+      for (std::uint32_t eye = 0; eye < 2; ++eye) {
+        id<MTLTexture> source = sources[eye];
+        const bool eye_needs_compute = requires_compute_copy(source.pixelFormat);
+        const auto& sub_image = views[eye].subImage;
+        if (!eye_needs_compute) {
+          id<MTLBlitCommandEncoder> blit = [command blitCommandEncoder];
+          [blit copyFromTexture:source
+                    sourceSlice:sub_image.imageArrayIndex
+                    sourceLevel:0
+                   sourceOrigin:MTLOriginMake(sub_image.imageRect.offset.x,
+                                              sub_image.imageRect.offset.y, 0)
+                     sourceSize:size
+                      toTexture:destination
+               destinationSlice:0
+               destinationLevel:0
+              destinationOrigin:MTLOriginMake(width * eye, 0, 0)];
+          [blit endEncoding];
+          continue;
+        }
+        id<MTLComputePipelineState> pipeline =
+            source.textureType == MTLTextureType2DArray ? rgba_array_copy_pipeline_
+                                                        : rgba_2d_copy_pipeline_;
+        id<MTLComputeCommandEncoder> compute = [command computeCommandEncoder];
+        [compute setComputePipelineState:pipeline];
+        [compute setTexture:source atIndex:0];
+        [compute setTexture:destination atIndex:1];
+        const RgbaCopyParameters parameters{
+            static_cast<std::uint32_t>(sub_image.imageRect.offset.x),
+            static_cast<std::uint32_t>(sub_image.imageRect.offset.y),
+            width,
+            height,
+            width * eye,
+            0,
+            sub_image.imageArrayIndex,
+            is_srgb_format(source.pixelFormat) ? 1U : 0U,
+        };
+        [compute setBytes:&parameters length:sizeof(parameters) atIndex:0];
+        const NSUInteger thread_width = pipeline.threadExecutionWidth;
+        const NSUInteger thread_height =
+            std::max<NSUInteger>(1, pipeline.maxTotalThreadsPerThreadgroup / thread_width);
+        const MTLSize threads = MTLSizeMake(thread_width, thread_height, 1);
+        [compute dispatchThreads:size threadsPerThreadgroup:threads];
+        [compute endEncoding];
+      }
+    } else {
+      id<MTLBlitCommandEncoder> blit = [command blitCommandEncoder];
+      for (std::uint32_t eye = 0; eye < 2; ++eye) {
+        [blit copyFromTexture:sources[eye]
+                  sourceSlice:views[eye].subImage.imageArrayIndex
+                  sourceLevel:0
+                 sourceOrigin:MTLOriginMake(views[eye].subImage.imageRect.offset.x,
+                                            views[eye].subImage.imageRect.offset.y, 0)
+                   sourceSize:size
+                    toTexture:destination
+             destinationSlice:0
+             destinationLevel:0
+            destinationOrigin:MTLOriginMake(width * eye, 0, 0)];
+      }
+      [blit endEncoding];
     }
-    [blit endEncoding];
     [command commit];
     [command waitUntilCompleted];
     const std::uint64_t copy_complete_ns = monotonic_now_ns();
@@ -294,24 +411,121 @@ class VideoEncoder {
     metadata->height = height;
     metadata->passthrough = passthrough;
     VTEncodeInfoFlags flags{};
-    const CMTime pts = CMTimeMake(static_cast<std::int64_t>(sequence), 90);
-    if (VTCompressionSessionEncodeFrame(session_, pixel, pts, kCMTimeInvalid, nullptr,
+    const CMTime pts = CMTimeMake(static_cast<std::int64_t>(sequence), 72);
+    NSDictionary* frame_properties = force_keyframe
+                                         ? @{(id)kVTEncodeFrameOptionKey_ForceKeyFrame : @YES}
+                                         : nil;
+    g_pending_encodes.fetch_add(1);
+    if (VTCompressionSessionEncodeFrame(session_, pixel, pts, kCMTimeInvalid,
+                                        (__bridge CFDictionaryRef)frame_properties,
                                         metadata.get(), &flags) == noErr) {
       (void)metadata.release();
+    } else {
+      g_pending_encodes.fetch_sub(1);
+      g_dropped_frames.fetch_add(1);
     }
     CFRelease(cv_texture);
     CFRelease(pixel);
   }
 
  private:
-  bool ensure(id<MTLDevice> device, std::uint32_t width, std::uint32_t height) {
-    if (session_ != nullptr && width_ == width && height_ == height) {
+  struct RgbaCopyParameters {
+    std::uint32_t source_x;
+    std::uint32_t source_y;
+    std::uint32_t width;
+    std::uint32_t height;
+    std::uint32_t destination_x;
+    std::uint32_t destination_y;
+    std::uint32_t source_slice;
+    std::uint32_t encode_srgb;
+  };
+
+  bool ensure_rgba_pipelines(id<MTLDevice> device) {
+    if (rgba_array_copy_pipeline_ != nil && rgba_2d_copy_pipeline_ != nil &&
+        pipeline_device_ == device) {
+      return true;
+    }
+    static NSString* const source = @R"metal(
+#include <metal_stdlib>
+using namespace metal;
+
+struct CopyParameters {
+  uint sourceX;
+  uint sourceY;
+  uint width;
+  uint height;
+  uint destinationX;
+  uint destinationY;
+  uint sourceSlice;
+  uint encodeSrgb;
+};
+
+float3 linearToSrgb(float3 value) {
+  const float3 low = value * 12.92;
+  const float3 high = 1.055 * pow(max(value, float3(0.0)), float3(1.0 / 2.4)) - 0.055;
+  return select(high, low, value <= 0.0031308);
+}
+
+kernel void copyRgbaEyeArray(texture2d_array<float, access::read> source [[texture(0)]],
+                        texture2d<float, access::write> destination [[texture(1)]],
+                        constant CopyParameters& parameters [[buffer(0)]],
+                        uint2 position [[thread_position_in_grid]]) {
+  if (position.x >= parameters.width || position.y >= parameters.height) return;
+  float4 color = source.read(uint2(parameters.sourceX, parameters.sourceY) + position,
+                             parameters.sourceSlice);
+  if (parameters.encodeSrgb != 0) color.rgb = linearToSrgb(color.rgb);
+  destination.write(color,
+                    uint2(parameters.destinationX, parameters.destinationY) + position);
+}
+
+kernel void copyRgbaEye2D(texture2d<float, access::read> source [[texture(0)]],
+                         texture2d<float, access::write> destination [[texture(1)]],
+                         constant CopyParameters& parameters [[buffer(0)]],
+                         uint2 position [[thread_position_in_grid]]) {
+  if (position.x >= parameters.width || position.y >= parameters.height) return;
+  float4 color = source.read(uint2(parameters.sourceX, parameters.sourceY) + position);
+  if (parameters.encodeSrgb != 0) color.rgb = linearToSrgb(color.rgb);
+  destination.write(color,
+                    uint2(parameters.destinationX, parameters.destinationY) + position);
+}
+)metal";
+    NSError* error{};
+    id<MTLLibrary> library = [device newLibraryWithSource:source options:nil error:&error];
+    id<MTLFunction> array_function = [library newFunctionWithName:@"copyRgbaEyeArray"];
+    id<MTLFunction> two_d_function = [library newFunctionWithName:@"copyRgbaEye2D"];
+    rgba_array_copy_pipeline_ = array_function == nil
+                                    ? nil
+                                    : [device newComputePipelineStateWithFunction:array_function
+                                                                             error:&error];
+    rgba_2d_copy_pipeline_ = two_d_function == nil
+                                 ? nil
+                                 : [device newComputePipelineStateWithFunction:two_d_function
+                                                                          error:&error];
+    pipeline_device_ =
+        rgba_array_copy_pipeline_ == nil || rgba_2d_copy_pipeline_ == nil ? nil : device;
+    if (pipeline_device_ == nil) {
+      const char* description = error.localizedDescription.UTF8String;
+      log_streaming_line("RGBA conversion pipeline failed: " +
+                         std::string(description == nullptr ? "unknown error" : description));
+      return false;
+    }
+    return true;
+  }
+
+  bool ensure(id<MTLDevice> device, std::uint32_t width, std::uint32_t height,
+              bool requires_rgba_pipeline) {
+    if (requires_rgba_pipeline && !ensure_rgba_pipelines(device)) {
+      return false;
+    }
+    if (session_ != nullptr && width_ == width && height_ == height && encoder_device_ == device) {
       return true;
     }
     if (session_ != nullptr) {
+      VTCompressionSessionCompleteFrames(session_, kCMTimeInvalid);
       VTCompressionSessionInvalidate(session_);
       CFRelease(session_);
       session_ = nullptr;
+      g_pending_encodes.store(0);
     }
     if (texture_cache_ != nullptr) {
       CFRelease(texture_cache_);
@@ -319,6 +533,7 @@ class VideoEncoder {
     }
     width_ = width;
     height_ = height;
+    encoder_device_ = device;
     if (CVMetalTextureCacheCreate(kCFAllocatorDefault, nullptr, device, nullptr,
                                   &texture_cache_) != kCVReturnSuccess ||
         VTCompressionSessionCreate(kCFAllocatorDefault, width, height, kCMVideoCodecType_H264,
@@ -331,7 +546,13 @@ class VideoEncoder {
                               kCFBooleanFalse);
     (void)VTSessionSetProperty(session_, kVTCompressionPropertyKey_ProfileLevel,
                               kVTProfileLevel_H264_Main_AutoLevel);
-    const int bit_rate = 20'000'000;
+    const std::uint32_t configured_mbps =
+        environment_uint("MAQUESTLINK_BITRATE_MBPS", 0, 0, 80);
+    const double baseline_pixels = 3360.0 * 1760.0;
+    const int auto_mbps = std::clamp(
+        static_cast<int>(20.0 * static_cast<double>(width) * height / baseline_pixels), 8, 40);
+    const int bit_rate =
+        static_cast<int>((configured_mbps == 0 ? auto_mbps : configured_mbps) * 1'000'000U);
     CFNumberRef rate = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &bit_rate);
     (void)VTSessionSetProperty(session_, kVTCompressionPropertyKey_AverageBitRate, rate);
     CFRelease(rate);
@@ -339,6 +560,18 @@ class VideoEncoder {
     CFNumberRef interval = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &key_interval);
     (void)VTSessionSetProperty(session_, kVTCompressionPropertyKey_MaxKeyFrameInterval, interval);
     CFRelease(interval);
+    const int expected_frame_rate = 72;
+    CFNumberRef expected_rate =
+        CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &expected_frame_rate);
+    (void)VTSessionSetProperty(session_, kVTCompressionPropertyKey_ExpectedFrameRate, expected_rate);
+    CFRelease(expected_rate);
+    g_stream_width.store(width);
+    g_stream_height.store(height);
+    log_streaming_line("encoder configured " + std::to_string(width) + "x" +
+                       std::to_string(height) + " bitrateMbps=" +
+                       std::to_string(bit_rate / 1'000'000) + " maxPending=" +
+                       std::to_string(environment_uint(
+                           "MAQUESTLINK_MAX_PENDING_FRAMES", 2, 1, 8)));
     return VTCompressionSessionPrepareToEncodeFrames(session_) == noErr;
   }
 
@@ -348,6 +581,10 @@ class VideoEncoder {
   std::uint32_t width_{};
   std::uint32_t height_{};
   std::uint64_t sequence_{};
+  id<MTLDevice> encoder_device_{};
+  id<MTLDevice> pipeline_device_{};
+  id<MTLComputePipelineState> rgba_array_copy_pipeline_{};
+  id<MTLComputePipelineState> rgba_2d_copy_pipeline_{};
 };
 
 VideoEncoder g_encoder;
@@ -380,6 +617,8 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_create_session(XrInstance instance,
     void* queue{};
     for (auto* chain = static_cast<const XrBaseInStructure*>(info->next); chain != nullptr;
          chain = chain->next) {
+      log_streaming_line("session next structure type=" +
+                         std::to_string(static_cast<std::int64_t>(chain->type)));
       if (chain->type == XR_TYPE_GRAPHICS_BINDING_METAL_KHR) {
         queue = reinterpret_cast<const XrGraphicsBindingMetalKHR*>(chain)->commandQueue;
       }
@@ -455,6 +694,9 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_enumerate_images(XrSwapchain swapchain, std:
   const auto next = next_function<PFN_xrEnumerateSwapchainImages>(instance, "xrEnumerateSwapchainImages");
   const XrResult result = next == nullptr ? XR_ERROR_HANDLE_INVALID : next(swapchain, capacity, count, images);
   if (XR_SUCCEEDED(result) && capacity > 0 && images != nullptr && count != nullptr) {
+    log_streaming_line("swapchain images type=" +
+                       std::to_string(static_cast<std::int64_t>(images->type)) +
+                       " count=" + std::to_string(*count));
     auto* metal = reinterpret_cast<XrSwapchainImageMetalKHR*>(images);
     std::scoped_lock lock(g_state_mutex);
     auto& textures = g_swapchains[swapchain].textures;
@@ -491,44 +733,127 @@ XRAPI_ATTR XrResult XRAPI_CALL hook_end_frame(XrSession session, const XrFrameEn
     session_data = g_sessions[session];
     instance = session_data.instance;
   }
-  if (transport_connected() && session_data.command_queue != nullptr && info != nullptr) {
+  const bool connected = transport_connected();
+  const bool force_keyframe = connected && !g_transport_was_connected.load();
+  if (!connected) g_transport_was_connected.store(false);
+  if (info != nullptr) {
+    const auto calls = g_end_frame_calls.fetch_add(1) + 1;
+    if (info->layerCount > 0) g_nonempty_end_frames.fetch_add(1);
+    if (calls % 300 == 0 && g_encoded_frames.load() == 0) {
+      log_streaming_line("capture pending endFrames=" + std::to_string(calls) +
+                         " nonempty=" + std::to_string(g_nonempty_end_frames.load()) +
+                         " connected=" + (connected ? "1" : "0") +
+                         " commandQueue=" +
+                         (session_data.command_queue != nullptr ? "present" : "missing"));
+    }
+  }
+  if (connected && session_data.command_queue != nullptr && info != nullptr) {
+    const bool log_layout = info->layerCount > 0 && !g_logged_frame_layout.exchange(true);
+    if (log_layout) {
+      log_streaming_line("frame layout layerCount=" + std::to_string(info->layerCount) +
+                         " commandQueue=present");
+    }
     const std::uint64_t capture_timestamp_ns = monotonic_now_ns();
     for (std::uint32_t layer_index = 0; layer_index < info->layerCount; ++layer_index) {
       const auto* base = info->layers[layer_index];
+      if (log_layout && base != nullptr) {
+        log_streaming_line("frame layer[" + std::to_string(layer_index) + "] type=" +
+                           std::to_string(static_cast<std::int64_t>(base->type)));
+      }
       if (base == nullptr || base->type != XR_TYPE_COMPOSITION_LAYER_PROJECTION) continue;
       const auto* projection = reinterpret_cast<const XrCompositionLayerProjection*>(base);
+      if (log_layout) {
+        log_streaming_line("projection viewCount=" + std::to_string(projection->viewCount));
+      }
       if (projection->viewCount < 2 || projection->views == nullptr) continue;
-      const XrSwapchain swapchain = projection->views[0].subImage.swapchain;
       const auto& left = projection->views[0].subImage;
       const auto& right = projection->views[1].subImage;
-      if (right.swapchain != swapchain || left.imageRect.extent.width <= 0 ||
+      if (log_layout) {
+        log_streaming_line(
+            "projection leftSwapchain=" +
+            std::to_string(reinterpret_cast<std::uintptr_t>(left.swapchain)) +
+            " rightSwapchain=" +
+            std::to_string(reinterpret_cast<std::uintptr_t>(right.swapchain)) +
+            " leftArray=" + std::to_string(left.imageArrayIndex) +
+            " rightArray=" + std::to_string(right.imageArrayIndex) +
+            " leftExtent=" + std::to_string(left.imageRect.extent.width) + "x" +
+            std::to_string(left.imageRect.extent.height) + " rightExtent=" +
+            std::to_string(right.imageRect.extent.width) + "x" +
+            std::to_string(right.imageRect.extent.height));
+      }
+      if (left.imageRect.extent.width <= 0 ||
           left.imageRect.extent.height <= 0 ||
           right.imageRect.extent.width != left.imageRect.extent.width ||
           right.imageRect.extent.height != left.imageRect.extent.height) {
         continue;
       }
-      SwapchainData data;
+      std::array<SwapchainData, 2> swapchain_data;
+      bool has_swapchain_data = true;
       {
         std::scoped_lock lock(g_state_mutex);
-        if (!g_swapchains.contains(swapchain)) break;
-        data = g_swapchains[swapchain];
+        for (std::uint32_t eye = 0; eye < 2; ++eye) {
+          const auto found = g_swapchains.find(projection->views[eye].subImage.swapchain);
+          if (found == g_swapchains.end()) {
+            has_swapchain_data = false;
+            break;
+          }
+          swapchain_data[eye] = found->second;
+        }
       }
-      if (data.last_acquired >= data.textures.size() ||
-          left.imageArrayIndex >= data.info.arraySize || right.imageArrayIndex >= data.info.arraySize) {
-        break;
+      if (!has_swapchain_data) continue;
+      std::array<id<MTLTexture>, 2> textures{};
+      bool valid_textures = true;
+      for (std::uint32_t eye = 0; eye < 2; ++eye) {
+        const auto& sub_image = projection->views[eye].subImage;
+        const auto& data = swapchain_data[eye];
+        if (data.last_acquired >= data.textures.size() ||
+            sub_image.imageArrayIndex >= data.info.arraySize) {
+          valid_textures = false;
+          break;
+        }
+        textures[eye] = (__bridge id<MTLTexture>)data.textures[data.last_acquired];
+        const auto texture_type = textures[eye].textureType;
+        const auto pixel_format = textures[eye].pixelFormat;
+        const bool valid_slice = texture_type == MTLTextureType2D
+                                     ? sub_image.imageArrayIndex == 0
+                                     : sub_image.imageArrayIndex < textures[eye].arrayLength;
+        const bool valid_rect = sub_image.imageRect.offset.x >= 0 &&
+                                sub_image.imageRect.offset.y >= 0 &&
+                                static_cast<std::uint64_t>(sub_image.imageRect.offset.x) +
+                                        static_cast<std::uint64_t>(sub_image.imageRect.extent.width) <=
+                                    textures[eye].width &&
+                                static_cast<std::uint64_t>(sub_image.imageRect.offset.y) +
+                                        static_cast<std::uint64_t>(sub_image.imageRect.extent.height) <=
+                                    textures[eye].height;
+        if (textures[eye] == nil ||
+            (texture_type != MTLTextureType2D && texture_type != MTLTextureType2DArray) ||
+            !supported_stream_format(pixel_format) || !valid_slice || !valid_rect) {
+          valid_textures = false;
+          break;
+        }
       }
+      if (!valid_textures) continue;
       id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)session_data.command_queue;
-      id<MTLTexture> texture = (__bridge id<MTLTexture>)data.textures[data.last_acquired];
-      if (texture.pixelFormat == MTLPixelFormatBGRA8Unorm ||
-          texture.pixelFormat == MTLPixelFormatBGRA8Unorm_sRGB) {
-        const bool passthrough =
-            info->environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND ||
-            info->environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE ||
-            (projection->layerFlags & XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT) != 0;
-        g_encoder.encode(queue, texture, static_cast<std::uint32_t>(left.imageRect.extent.width),
-                         static_cast<std::uint32_t>(left.imageRect.extent.height),
-                         projection->views, capture_timestamp_ns, passthrough);
+      if (log_layout) {
+        for (std::uint32_t eye = 0; eye < 2; ++eye) {
+          log_streaming_line("projection texture[" + std::to_string(eye) + "] format=" +
+                             std::to_string(static_cast<std::uint64_t>(textures[eye].pixelFormat)) +
+                             " type=" +
+                             std::to_string(static_cast<std::uint64_t>(textures[eye].textureType)) +
+                             " arrayLength=" + std::to_string(textures[eye].arrayLength));
+        }
+        log_streaming_line(std::string("projection swapchainMode=") +
+                           (left.swapchain == right.swapchain ? "single-array" : "per-eye"));
       }
+      g_transport_was_connected.store(true);
+      const bool passthrough =
+          info->environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND ||
+          info->environmentBlendMode == XR_ENVIRONMENT_BLEND_MODE_ADDITIVE ||
+          (projection->layerFlags & XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT) != 0;
+      g_encoder.encode(queue, textures,
+                       static_cast<std::uint32_t>(left.imageRect.extent.width),
+                       static_cast<std::uint32_t>(left.imageRect.extent.height),
+                       projection->views, capture_timestamp_ns, passthrough, force_keyframe);
       break;
     }
   }

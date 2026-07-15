@@ -27,6 +27,7 @@ if [[ -d "$META_CORE_LOCAL" ]]; then
     "s|\"com.meta.xr.sdk.core\": \"203.0.0\"|\"com.meta.xr.sdk.core\": \"file:$META_CORE_LOCAL\"|" \
     "$MANIFEST"
 fi
+UNITY="$UNITY" "$ROOT_DIR/scripts/build_quest_projection.sh"
 "$UNITY" \
   -batchmode \
   -nographics \

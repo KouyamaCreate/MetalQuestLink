@@ -16,15 +16,24 @@ namespace MaQuestLink.QuestClient
         private Component overlay;
         private Type overlayType;
         private bool passthroughApproximation;
+        private bool immersiveProjection;
 
         public int SurfaceWidth => surfaceWidth;
         public int SurfaceHeight => surfaceHeight;
         public bool WorldFixed => worldFixed;
+        public string ProjectionMode =>
+            immersiveProjection || ImmersiveProjectionFeature.IsAvailable
+                ? "immersive_projection"
+                : worldFixed ? "world_fixed_quad_fallback" : "head_locked_quad_fallback";
         public bool PassthroughApproximation => passthroughApproximation;
 
         public void SetPassthroughApproximation(bool enabled)
         {
             passthroughApproximation = enabled;
+            if (immersiveProjection)
+            {
+                return;
+            }
             EnsureOverlay();
             SetMember("overridePerLayerColorScaleAndOffset", enabled);
             SetMember("colorScale", enabled
@@ -37,7 +46,7 @@ namespace MaQuestLink.QuestClient
         {
             surfaceWidth = Math.Max(2, width);
             surfaceHeight = Math.Max(2, height);
-            if (overlay != null)
+            if (!immersiveProjection && overlay != null)
             {
                 SetMember("externalSurfaceWidth", surfaceWidth);
                 SetMember("externalSurfaceHeight", surfaceHeight);
@@ -47,6 +56,11 @@ namespace MaQuestLink.QuestClient
         public AndroidJavaObject TryGetSurface()
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
+            immersiveProjection |= ImmersiveProjectionFeature.IsAvailable;
+            if (immersiveProjection)
+            {
+                return ImmersiveProjectionFeature.TryCreateSurface(surfaceWidth, surfaceHeight);
+            }
             if (overlay == null)
             {
                 EnsureOverlay();
@@ -65,13 +79,17 @@ namespace MaQuestLink.QuestClient
 
         private void Awake()
         {
-            EnsureOverlay();
-            AttachToHead();
+            immersiveProjection = ImmersiveProjectionFeature.IsAvailable;
+            if (!immersiveProjection)
+            {
+                EnsureOverlay();
+                AttachToHead();
+            }
         }
 
         private void LateUpdate()
         {
-            if (!worldFixed && transform.parent == null)
+            if (!immersiveProjection && !worldFixed && transform.parent == null)
             {
                 AttachToHead();
             }
@@ -80,6 +98,11 @@ namespace MaQuestLink.QuestClient
         /// <summary>Macが描画したhead poseへQuadを固定し、Quest compositorのworld-space reprojectionを使う。</summary>
         public bool ApplyRenderPose(VideoFrame frame)
         {
+            immersiveProjection |= ImmersiveProjectionFeature.IsAvailable;
+            if (immersiveProjection)
+            {
+                return ImmersiveProjectionFeature.SubmitFrame(frame, passthroughApproximation);
+            }
             if (!worldFixed || !TryGetWorldPose(frame, distanceMeters, out var position, out var rotation))
             {
                 return false;

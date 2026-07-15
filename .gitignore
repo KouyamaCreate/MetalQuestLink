@@ -1,4 +1,5 @@
 /build/
+/build-android-projection/
 /.codex/
 /quest-client/Builds/
 /quest-client/.utmp/

@@ -9,6 +9,8 @@ namespace MaQuestLink.Editor
     public static class OpenXRLayerInstaller
     {
         public const string LayerName = "XR_APILAYER_MAQUESTLINK_streaming";
+        public const string DefaultSimulatorRuntimeJson =
+            "/Applications/MetaXRSimulator.app/Contents/Resources/MetaXRSimulator/meta_openxr_simulator.json";
 
         public static string StatusPath => Path.Combine(ProjectStateDirectory, "status.json");
         public static string LogPath => Path.Combine(ProjectStateDirectory, "layer.log");
@@ -21,8 +23,17 @@ namespace MaQuestLink.Editor
             Environment.SetEnvironmentVariable("MAQUESTLINK_ENABLE_API_LAYER", "1");
             Environment.SetEnvironmentVariable("MAQUESTLINK_DISABLE_API_LAYER", null);
             Environment.SetEnvironmentVariable("MAQUESTLINK_PORT", MaQuestLinkSettings.instance.port.ToString());
+            Environment.SetEnvironmentVariable(
+                "MAQUESTLINK_BITRATE_MBPS", MaQuestLinkSettings.instance.bitrateMbps.ToString());
+            Environment.SetEnvironmentVariable(
+                "MAQUESTLINK_MAX_PENDING_FRAMES", MaQuestLinkSettings.instance.maxPendingFrames.ToString());
             Environment.SetEnvironmentVariable("MAQUESTLINK_LAYER_LOG", LogPath);
             Environment.SetEnvironmentVariable("MAQUESTLINK_STATUS_FILE", StatusPath);
+            var runtimeJson = FindSimulatorRuntimeJson();
+            if (!string.IsNullOrEmpty(runtimeJson))
+            {
+                Environment.SetEnvironmentVariable("XR_RUNTIME_JSON", runtimeJson);
+            }
         }
 
         public static string RegisterLayer()
@@ -96,7 +107,7 @@ namespace MaQuestLink.Editor
             var configured = MaQuestLinkSettings.instance.apkPath;
             if (!string.IsNullOrEmpty(configured))
             {
-                return Path.GetFullPath(configured);
+                return ResolveProjectPath(configured);
             }
             var package = PackageInfo.FindForAssembly(typeof(OpenXRLayerInstaller).Assembly);
             if (package == null)
@@ -117,9 +128,40 @@ namespace MaQuestLink.Editor
             return Path.GetFullPath(candidates[0]);
         }
 
+        public static string FindSimulatorRuntimeJson()
+        {
+            var candidates = new[]
+            {
+                MaQuestLinkSettings.instance.openXrRuntimeJsonPath,
+                Environment.GetEnvironmentVariable("MAQUESTLINK_XR_RUNTIME_JSON"),
+                Environment.GetEnvironmentVariable("XR_RUNTIME_JSON"),
+                DefaultSimulatorRuntimeJson,
+            };
+            foreach (var candidate in candidates)
+            {
+                var resolved = ResolveProjectPath(candidate);
+                if (!string.IsNullOrWhiteSpace(resolved) && File.Exists(resolved))
+                {
+                    return resolved;
+                }
+            }
+            return null;
+        }
+
         private static string EscapeJson(string value)
         {
             return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        }
+
+        public static string ResolveProjectPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+            return Path.GetFullPath(Path.IsPathRooted(path)
+                ? path
+                : Path.Combine(Path.GetFullPath(Path.Combine(Application.dataPath, "..")), path));
         }
     }
 }

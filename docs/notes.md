@@ -65,7 +65,7 @@
 
 ### 現時点の制約
 
-- Phase 2の映像抽出は、左右眼が同じ2D-array swapchainにあり、BGRA8UnormまたはBGRA8Unorm_sRGBである構成を対象とする。Meta XR Simulator native E2Eではこの構成を実測確認した。Unity/OVRPluginの実際のswapchain構成はPhase 5で検証する。
+- Phase 2時点の映像抽出は、左右眼が同じ2D-array swapchainにあり、BGRA8UnormまたはBGRA8Unorm_sRGBである構成を対象としていた。後続のUnity 6000.2.5f1 / ParaSights実シーン検証でRGBA8Unorm_sRGBが使われることを確認し、Metal computeによるBGRA変換を追加した。
 
 ## 2026-07-15 — Phase 3 実測
 
@@ -227,3 +227,19 @@
 - 自動判定は`active_hand_joints=52`、`hands_sent=2465`、`passthrough=1`、receive 74 fps、decode 76 fps、Pose 74 Hzで成功した。
 - Unity sampleのEditMode 4/4、PlayMode 1/1が成功し、Play hookの`adb reverse`、Quest client起動、Passthrough / hands指定を確認した。
 - Quest activityがPlay hookからresumedになり、OVRPluginのPassthrough初期化とcamera stream開始をlogcatで確認した。
+
+## 2026-07-15 — 一人称projection化
+
+- 既存のworld-fixed Quadはcompositor再投影されても有限平面であり、視野周辺に板の境界が見える。VR一人称表示にはprojection layerが必要と判断した。
+- Quest runtimeで`XR_KHR_android_surface_swapchain` SpecVersion 4と`XR_KHR_composition_layer_color_scale_bias` SpecVersion 5が列挙されることを実機logcatで確認した。
+- MediaCodecのAndroid SurfaceをOpenXR swapchainとして生成し、wireの左右眼pose/FOVとside-by-side rectを`XrCompositionLayerProjection`へ提出するnative hookを追加した。
+- native pluginのELF LOAD alignmentはlinker option適用後すべて`0x4000`。APK内`lib/arm64-v8a/libmaquestlink_projection.so`への同梱も確認した。
+- Quest EditModeはprojection mapping追加後に成功した。修正版APKをQuest 3へ導入し、ユーザーが有限Quadではない一人称projection表示を装着目視で確認した。
+
+## 2026-07-15 — project差吸収と負荷制御
+
+- ParaSightsはUnity 6000.2.5f1、sampleは6000.3.6f1で動作する。Editor packageの最低versionを6000.2とし、両方が使うOpenXR 1.15.1 / XR Management 4.5.1を依存関係へ明記した。
+- loader順序のpure testはOpenXRを先頭へ移し、重複を除きながらvendor loaderとMock HMD loaderの順を保持した。
+- Editor integrationはproject path解決、Unity version parse、ADB extras / serial、status追加項目を含むEditMode 9/9、Simulator PlayMode 1/1が成功した。
+- nativeの通常2D-array testは3360x1760 H.264を120/120 decode。左右別2D swapchain testも同じ解像度を120/120 decodeし、layer logの`swapchainMode=per-eye`を確認した。
+- auto bitrateは3360x1760で20 Mbpsとなる。`MAQUESTLINK_MAX_PENDING_FRAMES`の既定2を超えるVideoToolbox待ちは送信遅延へ積まずdropし、statusの`droppedFrames`で観測する。
