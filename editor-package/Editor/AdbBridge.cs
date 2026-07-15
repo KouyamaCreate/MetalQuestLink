@@ -21,6 +21,7 @@ namespace MaQuestLink.Editor
     public static class AdbBridge
     {
         public const string PackageName = "com.maquestlink.questclient";
+        public const string ActivityName = "com.unity3d.player.UnityPlayerGameActivity";
 
         public static AdbResult Reverse()
         {
@@ -45,7 +46,16 @@ namespace MaQuestLink.Editor
             {
                 return reverse;
             }
-            return Run($"shell monkey -p {PackageName} -c android.intent.category.LAUNCHER 1");
+            return Run(BuildStartClientArguments());
+        }
+
+        public static string BuildStartClientArguments()
+        {
+            var settings = MaQuestLinkSettings.instance;
+            return $"shell am start -S -n {PackageName}/{ActivityName} " +
+                   $"--ei maquestlink_port {settings.port} " +
+                   $"--ez maquestlink_passthrough {BooleanArgument(settings.enablePassthroughPreview)} " +
+                   $"--ez maquestlink_hand_visualization {BooleanArgument(settings.showTrackedHands)}";
         }
 
         public static AdbResult Run(string arguments, int timeoutMilliseconds = 15000)
@@ -124,6 +134,11 @@ namespace MaQuestLink.Editor
         private static string Quote(string value)
         {
             return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+        }
+
+        private static string BooleanArgument(bool value)
+        {
+            return value ? "true" : "false";
         }
     }
 }

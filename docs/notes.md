@@ -220,3 +220,10 @@
 - device scriptが合成入力用の固定pose値を実機にも要求していたため、実機専用modeを追加した。実機modeはQuest診断のPose / hand rateとOpenXR haptic往復で判定する。
 - hapticの初回命令はQuest接続成立前に破棄されたため、実機test中だけapply / stopを周期再送する。製品runtimeのhaptic挙動には影響しない。
 - 自動E2EはMediaCodec Surface releaseと設定値を検証する。装着時の光学的表示品質、実jointの見え方、振動体感、Passthrough視認性は未確認。
+
+## 2026-07-15 — 装着ハンド／パススルー追試とPlay統合
+
+- 診断用hand skeletonを有効にして装着テストし、ユーザーが手の認識と開閉追従、Passthrough表示を確認した。
+- 自動判定は`active_hand_joints=52`、`hands_sent=2465`、`passthrough=1`、receive 74 fps、decode 76 fps、Pose 74 Hzで成功した。
+- Unity sampleのEditMode 4/4、PlayMode 1/1が成功し、Play hookの`adb reverse`、Quest client起動、Passthrough / hands指定を確認した。
+- Quest activityがPlay hookからresumedになり、OVRPluginのPassthrough初期化とcamera stream開始をlogcatで確認した。

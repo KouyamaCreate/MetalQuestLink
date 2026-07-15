@@ -47,6 +47,9 @@ namespace MaQuestLink.Editor
             settings.adbPath = EditorGUILayout.TextField("adb path", settings.adbPath);
             settings.apkPath = EditorGUILayout.TextField("APK path", settings.apkPath);
             settings.autoStartQuestClient = EditorGUILayout.Toggle("Start client on Play", settings.autoStartQuestClient);
+            settings.enablePassthroughPreview = EditorGUILayout.Toggle(
+                "Passthrough preview", settings.enablePassthroughPreview);
+            settings.showTrackedHands = EditorGUILayout.Toggle("Show tracked hands", settings.showTrackedHands);
             if (EditorGUI.EndChangeCheck())
             {
                 settings.SaveSettings();

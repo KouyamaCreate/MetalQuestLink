@@ -294,7 +294,10 @@ void verify_input_state(XrSession session, XrSpace local_space, XrTime time,
       near(joints[XR_HAND_JOINT_INDEX_TIP_EXT].pose.position.x, -0.24F) &&
       near(joints[XR_HAND_JOINT_INDEX_TIP_EXT].pose.position.y, 1.12F) &&
       near(joints[XR_HAND_JOINT_INDEX_TIP_EXT].radius, 0.008F);
-  if (hand_located && (!test.synthetic || expected_hand)) {
+  const bool live_hand = hand_locations.isActive &&
+                         (joints[XR_HAND_JOINT_INDEX_TIP_EXT].locationFlags &
+                          XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0;
+  if (hand_located && (test.synthetic ? expected_hand : live_hand)) {
     test.hand_verified = true;
   }
 
@@ -669,11 +672,13 @@ int run(int argc, char** argv) {
               << input_test.hand_verified << " haptics=1\n";
   }
   if (verify_device_input &&
-      (!input_test.actions_verified || !input_test.haptic_applied || !input_test.haptic_stopped)) {
+      (!input_test.actions_verified || (require_hands && !input_test.hand_verified) ||
+       !input_test.haptic_applied || !input_test.haptic_stopped)) {
     throw std::runtime_error("device input path did not complete OpenXR action and haptic calls");
   }
   if (verify_device_input) {
-    std::cout << "MAQUESTLINK_DEVICE_INPUT_E2E_OK actions=1 haptics=1\n";
+    std::cout << "MAQUESTLINK_DEVICE_INPUT_E2E_OK actions=1 hands="
+              << input_test.hand_verified << " haptics=1\n";
   }
   if (input_test.left_hand_tracker != XR_NULL_HANDLE) {
     check(input_test.destroy_hand_tracker(input_test.left_hand_tracker),

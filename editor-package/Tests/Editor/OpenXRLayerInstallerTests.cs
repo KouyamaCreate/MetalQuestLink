@@ -62,5 +62,22 @@ namespace MaQuestLink.Editor.Tests
             Assert.IsFalse(status.connected);
             Assert.That(status.fps, Is.EqualTo(72.0f));
         }
+
+        [Test]
+        public void QuestClientLaunchIncludesRealtimePreviewOptions()
+        {
+            var settings = MaQuestLinkSettings.instance;
+            settings.port = 42424;
+            settings.enablePassthroughPreview = true;
+            settings.showTrackedHands = true;
+
+            var arguments = AdbBridge.BuildStartClientArguments();
+
+            StringAssert.Contains("am start -S", arguments);
+            StringAssert.Contains(AdbBridge.PackageName + "/" + AdbBridge.ActivityName, arguments);
+            StringAssert.Contains("--ei maquestlink_port 42424", arguments);
+            StringAssert.Contains("--ez maquestlink_passthrough true", arguments);
+            StringAssert.Contains("--ez maquestlink_hand_visualization true", arguments);
+        }
     }
 }

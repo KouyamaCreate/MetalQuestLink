@@ -203,3 +203,5 @@
   - Quest 3 (`eureka`)をUSB接続し、`scripts/e2e_device.sh`が成功。
   - 最終配布APKで`MAQUESTLINK_DEVICE_E2E_OK received_fps=74 decode_fps=76 pose_hz=73 capture_to_decode_ms=140.498283 hands_sent=2113 haptics_received=34 passthrough=1`。
   - MediaCodec Surface release、world-fixed、clock sync、Pose / hand送信、Touch haptic command受信、Passthrough underlay設定を同時に確認した。装着時の見え方と振動体感は別途目視確認が必要。
+  - 装着追試で左右の診断用hand skeletonと指開閉、Passthroughを目視確認した。active jointは52/52。
+  - Play即時preview統合後のEditor EditMode 4/4、sample PlayMode 1/1が成功。Play時はAPKを再buildせずインストール済みclientを起動する。

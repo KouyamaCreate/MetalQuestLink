@@ -237,3 +237,12 @@
 - 実機testでは接続成立前のhaptic dropを避けるためapply / stopを周期再送する。
 - device scriptはbackground processをwaitして正常に回収し、producer失敗時にMac log末尾と関連Quest例外を表示する。
 - 最終配布APKのQuest 3実機E2Eはreceive 74 fps、decode 76 fps、Pose 73 Hz、capture-to-decode 140.498283 ms、hand message 2,113件、haptic 34件、world-fixed / clock sync / Passthrough有効で成功した。
+
+### ハンド可視化とPlay即時プレビュー
+
+- Quest clientへ左右26関節のprocedural skeleton表示を追加した。Android playerでprimitive collider classがstripされる問題を避け、MeshFilter / MeshRendererだけで生成する。
+- device E2Eへhand visualizationとactive joint必須modeを追加し、Quest 3実機で左右52関節、hand message 2,465件、Passthrough有効を同時確認した。
+- Editor packageのPlay hookはAPKをbuildせず、adb reverse後にインストール済みclientをPassthrough / hand visualization extras付きで起動する。
+- `Window > MaQuestLink`へ`Passthrough preview`と`Show tracked hands`を追加した。
+
+理由: コントローラなしでも追跡結果を目視でき、既存Unity projectのPlayからAndroid build待ちなしで実機previewへ入れるようにするため。

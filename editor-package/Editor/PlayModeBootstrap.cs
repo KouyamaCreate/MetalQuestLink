@@ -35,13 +35,16 @@ namespace MaQuestLink.Editor
             try
             {
                 var manifest = OpenXRLayerInstaller.RegisterLayer();
-                var reverse = AdbBridge.Reverse();
-                if (MaQuestLinkSettings.instance.autoStartQuestClient && reverse.Success)
-                {
-                    AdbBridge.StartClient();
-                }
-                Debug.Log($"MAQUESTLINK_PLAY_READY manifest={manifest} adbReverse={reverse.Success} " +
+                var settings = MaQuestLinkSettings.instance;
+                var adb = settings.autoStartQuestClient ? AdbBridge.StartClient() : AdbBridge.Reverse();
+                Debug.Log($"MAQUESTLINK_PLAY_READY manifest={manifest} adbReady={adb.Success} " +
+                          $"questClientStarted={settings.autoStartQuestClient && adb.Success} " +
+                          $"passthrough={settings.enablePassthroughPreview} hands={settings.showTrackedHands} " +
                           $"status=waiting_for_connection port={MaQuestLinkSettings.instance.port}");
+                if (!adb.Success)
+                {
+                    Debug.LogWarning($"MAQUESTLINK_ADB_SETUP_FAILED exit={adb.ExitCode} output={adb.Output}");
+                }
             }
             catch (Exception exception)
             {

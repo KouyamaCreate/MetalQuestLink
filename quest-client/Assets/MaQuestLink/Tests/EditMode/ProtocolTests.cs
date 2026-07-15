@@ -113,6 +113,37 @@ namespace MaQuestLink.QuestClient.Tests
         }
 
         [Test]
+        public void HandVisualizer_CountsOnlyActiveValidJoints()
+        {
+            var hands = CreateHands();
+            Assert.That(HandTrackingVisualizer.CountValidJoints(hands), Is.EqualTo(52));
+
+            hands.LeftActive = false;
+            Assert.That(HandTrackingVisualizer.CountValidJoints(hands), Is.EqualTo(26));
+
+            hands.RightJoints[10].Pose.Flags = 0;
+            Assert.That(HandTrackingVisualizer.CountValidJoints(hands), Is.EqualTo(25));
+        }
+
+        [Test]
+        public void HandVisualizer_CreatesAndUpdatesBothSkeletons()
+        {
+            var root = new GameObject("HandVisualizerTest");
+            try
+            {
+                var visualizer = root.AddComponent<HandTrackingVisualizer>();
+                visualizer.UpdateHands(CreateHands());
+                Assert.IsTrue(visualizer.LeftVisible);
+                Assert.IsTrue(visualizer.RightVisible);
+                Assert.That(visualizer.VisibleJointCount, Is.EqualTo(52));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void InvalidMessagesAreRejected()
         {
             var valid = Protocol.Serialize(new WireMessage(1, CreatePoseInput()));

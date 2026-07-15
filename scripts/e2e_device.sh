@@ -12,6 +12,15 @@ LOGCAT_LOG="$ROOT_DIR/build/phase4-device-logcat-$RUN_ID.log"
 PRODUCER_LOG="$ROOT_DIR/build/phase4-device-producer-$RUN_ID.log"
 LOGCAT_PID=""
 PRODUCER_PID=""
+HAND_VISUALIZATION="${MAQUESTLINK_HAND_VISUALIZATION:-0}"
+REQUIRE_ACTIVE_HANDS="${MAQUESTLINK_REQUIRE_ACTIVE_HANDS:-0}"
+if [[ "$REQUIRE_ACTIVE_HANDS" == "1" ]]; then
+  HAND_VISUALIZATION="1"
+fi
+HAND_VISUALIZATION_BOOL="false"
+if [[ "$HAND_VISUALIZATION" == "1" ]]; then
+  HAND_VISUALIZATION_BOOL="true"
+fi
 
 cleanup() {
   if [[ -n "$LOGCAT_PID" ]] && kill -0 "$LOGCAT_PID" 2>/dev/null; then
@@ -65,12 +74,19 @@ LOGCAT_PID="$!"
 "$ADB" shell am start -S -n "$PACKAGE/$ACTIVITY" \
   --ez maquestlink_diagnostic true \
   --ez maquestlink_passthrough true \
+  --ez maquestlink_hand_visualization "$HAND_VISUALIZATION_BOOL" \
   --es maquestlink_host 127.0.0.1 \
   --ei maquestlink_port "$PORT"
 
-MAQUESTLINK_PORT="$PORT" MAQUESTLINK_VERIFY_DEVICE_INPUT=1 \
-MAQUESTLINK_TEST_FRAMES="${MAQUESTLINK_DEVICE_FRAMES:-2400}" \
-  "$ROOT_DIR/scripts/test_phase1.sh" >"$PRODUCER_LOG" 2>&1 &
+PRODUCER_ENV=(
+  "MAQUESTLINK_PORT=$PORT"
+  "MAQUESTLINK_VERIFY_DEVICE_INPUT=1"
+  "MAQUESTLINK_TEST_FRAMES=${MAQUESTLINK_DEVICE_FRAMES:-2400}"
+)
+if [[ "$REQUIRE_ACTIVE_HANDS" == "1" ]]; then
+  PRODUCER_ENV+=("MAQUESTLINK_REQUIRE_HANDS=1")
+fi
+env "${PRODUCER_ENV[@]}" "$ROOT_DIR/scripts/test_phase1.sh" >"$PRODUCER_LOG" 2>&1 &
 PRODUCER_PID="$!"
 set +e
 wait "$PRODUCER_PID"
@@ -100,6 +116,7 @@ LAST_LATENCY="$(rg 'MAQUESTLINK_DIAGNOSTIC.*"connected":true.*"received_fps":([3
   sed -nE 's/.*"capture_to_decode_ms":([0-9]+([.][0-9]+)?).*/\1/p' | tail -1)"
 MAX_HANDS="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"hands_sent":([0-9]+).*/\1/' | sort -n | tail -1)"
 MAX_HAPTICS="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"haptics_received":([0-9]+).*/\1/' | sort -n | tail -1)"
+MAX_VALID_HAND_JOINTS="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"valid_hand_joints":([0-9]+).*/\1/' | sort -n | tail -1)"
 
 if (( MAX_RECEIVE < 30 || MAX_DECODE < 30 || MAX_POSE < 60 )); then
   echo "Phase 4 device E2E failed: received_fps=$MAX_RECEIVE decode_fps=$MAX_DECODE pose_hz=$MAX_POSE" >&2
@@ -115,7 +132,11 @@ if (( MAX_HANDS < 1 || MAX_HAPTICS < 1 )) || \
   echo "Phase 8 device E2E failed: hands_sent=$MAX_HANDS haptics_received=$MAX_HAPTICS or passthrough inactive" >&2
   exit 1
 fi
+if [[ "$REQUIRE_ACTIVE_HANDS" == "1" ]] && (( MAX_VALID_HAND_JOINTS < 20 )); then
+  echo "Active hand tracking failed: valid_hand_joints=$MAX_VALID_HAND_JOINTS (show a hand to the headset cameras)" >&2
+  exit 1
+fi
 
-echo "MAQUESTLINK_DEVICE_E2E_OK received_fps=$MAX_RECEIVE decode_fps=$MAX_DECODE pose_hz=$MAX_POSE capture_to_decode_ms=$LAST_LATENCY hands_sent=$MAX_HANDS haptics_received=$MAX_HAPTICS passthrough=1"
+echo "MAQUESTLINK_DEVICE_E2E_OK received_fps=$MAX_RECEIVE decode_fps=$MAX_DECODE pose_hz=$MAX_POSE capture_to_decode_ms=$LAST_LATENCY hands_sent=$MAX_HANDS active_hand_joints=$MAX_VALID_HAND_JOINTS haptics_received=$MAX_HAPTICS passthrough=1"
 echo "Logcat: $LOGCAT_LOG"
 echo "Producer: $PRODUCER_LOG"

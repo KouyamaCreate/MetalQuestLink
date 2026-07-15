@@ -13,11 +13,14 @@ namespace MaQuestLink.QuestClient
         [SerializeField] private int port = DefaultPort;
         [SerializeField] private bool diagnosticMode;
         [SerializeField] private bool passthroughMode;
+        [SerializeField] private bool handVisualizationMode;
         [SerializeField] private ExternalSurfacePresenter presenter;
 
         private StreamTransport transport;
         private MediaCodecDecoder decoder;
         private QuestHaptics haptics;
+        private HandTrackingVisualizer handVisualizer;
+        private HandTrackingInput latestHands;
         private float nextDiagnosticTime;
         private long previousReceived;
         private long previousDecoded;
@@ -33,6 +36,10 @@ namespace MaQuestLink.QuestClient
             transport = new StreamTransport();
             decoder = new MediaCodecDecoder();
             haptics = new QuestHaptics();
+            if (handVisualizationMode)
+            {
+                handVisualizer = gameObject.AddComponent<HandTrackingVisualizer>();
+            }
         }
 
         private void Start()
@@ -51,7 +58,9 @@ namespace MaQuestLink.QuestClient
         {
             // Update follows the Quest display cadence (72/80/90Hz), satisfying the >=60Hz input path.
             var pose = QuestInputSampler.Sample();
-            transport.SubmitLatestHands(QuestHandSampler.Sample(pose.SampleTimestampNs));
+            latestHands = QuestHandSampler.Sample(pose.SampleTimestampNs);
+            transport.SubmitLatestHands(latestHands);
+            handVisualizer?.UpdateHands(latestHands);
             transport.SubmitLatestPose(pose);
             while (transport.TryDequeueHaptic(out var haptic))
             {
@@ -119,6 +128,10 @@ namespace MaQuestLink.QuestClient
                 poses_sent = sent,
                 hands_sent = transport.SentHands,
                 haptics_received = transport.ReceivedHaptics,
+                left_hand_active = latestHands?.LeftActive == true,
+                right_hand_active = latestHands?.RightActive == true,
+                valid_hand_joints = HandTrackingVisualizer.CountValidJoints(latestHands),
+                hand_visualization = handVisualizer != null,
                 received_fps = received - previousReceived,
                 decode_fps = decoded - previousDecoded,
                 pose_hz = sent - previousSent,
@@ -151,6 +164,8 @@ namespace MaQuestLink.QuestClient
                     wifiFallbackHost = intent.Call<string>("getStringExtra", "maquestlink_wifi_host") ?? wifiFallbackHost;
                     port = intent.Call<int>("getIntExtra", "maquestlink_port", port);
                     passthroughMode = intent.Call<bool>("getBooleanExtra", "maquestlink_passthrough", passthroughMode);
+                    handVisualizationMode = intent.Call<bool>(
+                        "getBooleanExtra", "maquestlink_hand_visualization", handVisualizationMode);
                 }
             }
             catch (Exception exception)
@@ -202,6 +217,10 @@ namespace MaQuestLink.QuestClient
             public long poses_sent;
             public long hands_sent;
             public long haptics_received;
+            public bool left_hand_active;
+            public bool right_hand_active;
+            public int valid_hand_joints;
+            public bool hand_visualization;
             public long received_fps;
             public long decode_fps;
             public long pose_hz;

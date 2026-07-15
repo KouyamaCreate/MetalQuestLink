@@ -92,7 +92,7 @@ MAQUESTLINK_ENABLE_API_LAYER=1 \
 
 rg -q 'result="Passed"' "${EDIT_RESULTS}"
 rg -q 'result="Passed"' "${PLAY_RESULTS}"
-rg -q 'MAQUESTLINK_SAMPLE_PLAY_VERIFIED layer=loaded status=waiting_for_connection' "${PLAY_LOG}"
+rg -q 'MAQUESTLINK_SAMPLE_PLAY_VERIFIED layer=loaded status=(connected|waiting_for_connection)' "${PLAY_LOG}"
 rg -q 'loaded instance for' "${PROJECT}/Library/MaQuestLink/layer.log"
 
 echo "Phase 5 Unity Editor integration passed"

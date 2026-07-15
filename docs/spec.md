@@ -56,17 +56,18 @@
 - MVP画面はhead-fixedの3.2 m幅Quad。`OVRCameraRig` / `OVRManager`を持つgenerated sceneをCLI build時に生成する。
 - HMDと左右controllerをUnity XR inputから毎Update取得し、OpenXR座標へ変換して最新PoseInputを送る。72 fpsを要求し、transportはbacklogを作らず最新sampleだけを送信する。
 - Unity XR HandsのHand Tracking SubsystemをAndroidで型指定して有効化する。同一feature IDを持つMicrosoft Hand Interaction Profileは使わない。追跡中の左右26関節をOpenXR順へ写し、PoseInputと同じ最新値優先transportで送る。
+- hand visualization指定時は受信側にcollider不要のprocedural joint sphere / bone cylinderを生成し、左手を緑、右手を青で表示する。追跡無効時は該当手を隠す。
 - HapticCommandは`OVRInput.SetControllerVibration`へ写し、duration満了またはstopで左右個別に停止する。Quest APIのfrequency値は0〜320 Hzを0〜1へ正規化する。
 - VideoFrameのPassthrough flag受信時はMeta Passthrough underlayを有効にし、External Surface overlay全体へ固定alpha 0.82を適用する。
 - 接続候補は`127.0.0.1`（`adb reverse tcp:42424 tcp:42424`）を先に試し、指定されたWi-Fi hostへfallbackする。切断後は500 ms間隔で自動再接続する。
-- `adb shell am start` extrasでdiagnostic、host、Wi-Fi fallback、portを上書きできる。diagnostic modeは毎秒 `MAQUESTLINK_DIAGNOSTIC` JSONをlogcatへ出す。
+- `adb shell am start` extrasでdiagnostic、host、Wi-Fi fallback、port、Passthrough、hand visualizationを上書きできる。diagnostic modeは毎秒 `MAQUESTLINK_DIAGNOSTIC` JSONをlogcatへ出す。
 - `scripts/test_quest_client.sh` はXR非依存のprotocol/transportをEditModeで検証し、`scripts/build_quest_client.sh` はIL2CPP/ARM64 APKを生成する。
 - `scripts/e2e_device.sh` はinstall、adb reverse、無装着power automation、起動、Mac producer、logcat判定を自動化し、receive/decode 30 fps以上とPose送信60 Hz以上を要求する。実機入力modeは合成固定値を要求せず、Quest診断のpose / hand送信と接続後に再送するhapticで全二重経路を判定する。producer失敗時はMac側末尾と関連するQuest例外を表示する。
 
 ### Unityエディタ統合
 
 - `editor-package/` はlocal UPM package `com.maquestlink.editor`。Unity起動時とPlay開始直前にlayer manifestを `$HOME/.local/share/openxr/1/api_layers/implicit.d` へ登録する。
-- Play開始直前に `MAQUESTLINK_ENABLE_API_LAYER`、port、layer log、status JSONの環境変数を設定する。ADB deviceがあれば `adb reverse` を設定し、既定ではQuest clientも起動する。
+- Play開始直前に `MAQUESTLINK_ENABLE_API_LAYER`、port、layer log、status JSONの環境変数を設定する。ADB deviceがあれば `adb reverse` を設定し、既定ではインストール済みQuest clientをPassthrough / hand visualization指定付きで起動する。Play時にAPK buildは行わない。
 - `Window > MaQuestLink` はQuest接続状態、fps、平均Metal copy / VideoToolbox encode合計時間、encoded frame数を表示する。layer登録、APK install、adb reverse、client起動を手動でも実行できる。
 - native layerは `MAQUESTLINK_STATUS_FILE` 指定時、connection、encoded frames、fps、平均copy / encode / pipeline msを1秒周期でatomic JSON更新する。
 - `samples/MetaXRMinimal/` はUnity 6000.3 project。Meta XR Core SDK 203.0.0の`OVRCameraRig`、左右Touch controllerの`OVRGrabber`、`OVRGrabbable` cubeを生成する。

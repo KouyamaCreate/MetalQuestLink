@@ -9,6 +9,8 @@ namespace MaQuestLink.Editor
         public string adbPath = string.Empty;
         public string apkPath = string.Empty;
         public bool autoStartQuestClient = true;
+        public bool enablePassthroughPreview = true;
+        public bool showTrackedHands = true;
 
         public void SaveSettings()
         {
