@@ -16,9 +16,11 @@ PRODUCER_PID=""
 cleanup() {
   if [[ -n "$LOGCAT_PID" ]] && kill -0 "$LOGCAT_PID" 2>/dev/null; then
     kill "$LOGCAT_PID" 2>/dev/null || true
+    wait "$LOGCAT_PID" 2>/dev/null || true
   fi
   if [[ -n "$PRODUCER_PID" ]] && kill -0 "$PRODUCER_PID" 2>/dev/null; then
     kill "$PRODUCER_PID" 2>/dev/null || true
+    wait "$PRODUCER_PID" 2>/dev/null || true
   fi
   "$ADB" shell am force-stop "$PACKAGE" >/dev/null 2>&1 || true
   "$ADB" shell am broadcast -a com.oculus.vrpowermanager.automation_enable >/dev/null 2>&1 || true
@@ -66,12 +68,24 @@ LOGCAT_PID="$!"
   --es maquestlink_host 127.0.0.1 \
   --ei maquestlink_port "$PORT"
 
-MAQUESTLINK_PORT="$PORT" MAQUESTLINK_VERIFY_INPUT=1 \
+MAQUESTLINK_PORT="$PORT" MAQUESTLINK_VERIFY_DEVICE_INPUT=1 \
 MAQUESTLINK_TEST_FRAMES="${MAQUESTLINK_DEVICE_FRAMES:-2400}" \
   "$ROOT_DIR/scripts/test_phase1.sh" >"$PRODUCER_LOG" 2>&1 &
 PRODUCER_PID="$!"
+set +e
 wait "$PRODUCER_PID"
+PRODUCER_RESULT="$?"
+set -e
 PRODUCER_PID=""
+if [[ "$PRODUCER_RESULT" -ne 0 ]]; then
+  echo "Mac producer failed (exit $PRODUCER_RESULT). See: $PRODUCER_LOG" >&2
+  tail -n 80 "$PRODUCER_LOG" >&2
+  if rg -q 'NullReferenceException|MAQUESTLINK.*FAILED' "$LOGCAT_LOG"; then
+    echo "Relevant Quest errors from: $LOGCAT_LOG" >&2
+    rg 'NullReferenceException|MAQUESTLINK.*FAILED' "$LOGCAT_LOG" | tail -n 20 >&2
+  fi
+  exit "$PRODUCER_RESULT"
+fi
 sleep 2
 
 if ! rg -q 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG"; then
@@ -82,7 +96,7 @@ fi
 MAX_RECEIVE="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"received_fps":([0-9]+).*/\1/' | sort -n | tail -1)"
 MAX_DECODE="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"decode_fps":([0-9]+).*/\1/' | sort -n | tail -1)"
 MAX_POSE="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"pose_hz":([0-9]+).*/\1/' | sort -n | tail -1)"
-LAST_LATENCY="$(rg 'MAQUESTLINK_DIAGNOSTIC.*"clock_synced":true' "$LOGCAT_LOG" | \
+LAST_LATENCY="$(rg 'MAQUESTLINK_DIAGNOSTIC.*"connected":true.*"received_fps":([3-9][0-9]|[1-9][0-9]{2,}).*"clock_synced":true' "$LOGCAT_LOG" | \
   sed -nE 's/.*"capture_to_decode_ms":([0-9]+([.][0-9]+)?).*/\1/p' | tail -1)"
 MAX_HANDS="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"hands_sent":([0-9]+).*/\1/' | sort -n | tail -1)"
 MAX_HAPTICS="$(rg 'MAQUESTLINK_DIAGNOSTIC' "$LOGCAT_LOG" | sed -E 's/.*"haptics_received":([0-9]+).*/\1/' | sort -n | tail -1)"

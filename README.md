@@ -166,7 +166,8 @@ Questは往復中央時刻から`host - client` offsetを推定します。
 
 Apple M4 Pro / Meta XR Simulator 201.0.0 / 3360x1760 SBS H.264のPhase 6回帰runでは、
 120-frame時点で平均Metal copy `1.83 ms`、平均VideoToolbox encode `15.58 ms`、合計`17.41 ms`、
-mock decode `76.26 fps`でした。Quest実機の`capture_to_receive_ms` / `capture_to_decode_ms`は未実測です。
+mock decode `76.26 fps`でした。最終配布APKのQuest 3実機E2Eではreceive最大`74 fps`、decode最大`76 fps`、
+Pose最大`73 Hz`、健全なstream中の`capture_to_decode_ms`は`140.498283 ms`でした。
 ここでいうdecode値はcompositor Surfaceへのreleaseまでであり、光学的motion-to-photon値ではありません。
 
 ## releaseを作る
@@ -312,8 +313,8 @@ scripts/e2e_device.sh
 
 - 対象はApple Silicon、Quest 3 / 3S、Unity 6000.3.6f1で検証した構成です。
 - 現在の公開想定binaryはad-hoc署名で、Apple Developer ID公証済みではありません。download経路によってはGatekeeper対応が必要です。
-- Quest実機でのMediaCodec External Surface表示、実fps/pose rate、capture-to-decode値はこの環境では未実測です。
-- Quest実機の26関節取得、Touch振動、Passthrough underlayとuniform alphaの見え方は未実測です。
+- Quest 3実機E2EでMediaCodec Surface release、実fps / pose rate、capture-to-decode、hand message、haptic command受信、Passthrough設定を確認済みです。
+- headset装着時の映像品質、実jointの見え方、Touch振動の体感、Passthrough underlayとuniform alphaの視認性は目視／体感確認が必要です。
 - パススルーは固定uniform alpha近似で、画素alpha、black key、premultiplied alpha、HEVC alphaには対応しません。
 - world-fixed Quadはrender head poseを使うcompositor再投影です。depth-aware / spacewarpではありません。
 - 映像は左右眼が同じBGRA 2D-array swapchainであるUnity/Simulator構成を前提にします。

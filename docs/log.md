@@ -229,3 +229,11 @@
 
 - Quest未接続のため、実機のMediaCodec表示、26関節60 Hz、Touch振動、Passthrough underlay / uniform alpha合成は未確認。
 - シーンアンカー、空間メッシュ、アイ／フェイストラッキング、画素alphaは明示的にスコープ外。
+
+### Quest 3実機E2E修正
+
+- generated sceneのpresenter参照が空になる生成順序を修正し、参照を明示保存した。runtimeでも欠落参照を再探索し、例外ループを防ぐ。
+- native testへ実機入力modeを追加した。合成固定値ではなく、Quest診断のPose / hand rateと接続後のhaptic往復を組み合わせて判定する。
+- 実機testでは接続成立前のhaptic dropを避けるためapply / stopを周期再送する。
+- device scriptはbackground processをwaitして正常に回収し、producer失敗時にMac log末尾と関連Quest例外を表示する。
+- 最終配布APKのQuest 3実機E2Eはreceive 74 fps、decode 76 fps、Pose 73 Hz、capture-to-decode 140.498283 ms、hand message 2,113件、haptic 34件、world-fixed / clock sync / Passthrough有効で成功した。

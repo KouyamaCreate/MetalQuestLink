@@ -210,3 +210,13 @@
 - Quest EditMode 9/9、Unity 6000.3.6f1 IL2CPP / ARM64 APK buildが成功。Phase 8 release APKのSHA-256は`51798579417bc867e1cd9c0b42c6299f5d6d498ba232feceaeae3803ad02f3ff`。
 - 最終`test_phase8.sh`はPhase 0〜7回帰、release checksum、doctor error 0、repository外tarball Unity/Simulator E2Eまで成功。Phase 3最終runは120/120、76.6143 fps、input 163 samples。
 - Quest未接続のためdevice E2Eはexit 2を期待値として扱い、実機が必要な4項目は最終レポートへ分離する。
+
+## 2026-07-15 — Quest 3実機追試
+
+- USB debuggingを承認したQuest 3 (`eureka`)へ修正版APKをinstallし、`scripts/e2e_device.sh`が成功した。
+- 最終配布APKの値はreceive最大74 fps、decode最大76 fps、Pose最大73 Hz、健全なstream中のcapture-to-decode 140.498283 ms、hand message 2,113件、haptic command 34件、Passthrough有効。
+- 実機修正後の配布APK SHA-256は`ea8f0ed6420dc0a4144b54e0357acbd430b3a0734e12076151434c1587a8f25a`、UPM tarballは`0d4a5284e9732a5247819cefc8df54a163d42e29f0ed9d2dc91a8f82d0a35518`。checksum検証は全3対象で成功した。
+- 初回APKではgenerated sceneの`QuestClientController.presenter`が未設定で、`EnablePassthrough` / `EmitDiagnostic`がNullReferenceExceptionになった。scene生成順序とserialized参照を修正し、runtime resolverも追加した。
+- device scriptが合成入力用の固定pose値を実機にも要求していたため、実機専用modeを追加した。実機modeはQuest診断のPose / hand rateとOpenXR haptic往復で判定する。
+- hapticの初回命令はQuest接続成立前に破棄されたため、実機test中だけapply / stopを周期再送する。製品runtimeのhaptic挙動には影響しない。
+- 自動E2EはMediaCodec Surface releaseと設定値を検証する。装着時の光学的表示品質、実jointの見え方、振動体感、Passthrough視認性は未確認。

@@ -12,7 +12,7 @@
 | 5 — Unityエディタ統合 | 完了 | EditMode 1/1、Meta XR Simulator PlayMode 1/1、layer load・接続待ち確認 |
 | 6 — 再投影・計測・ドキュメント | 完了 | world pose / clock unit 3/3、clock sync E2E、Phase 0〜5回帰成功 |
 | 7 — 配布パッケージング | 完了 | 配布4点・checksum・repository外tarball Unity/Simulator E2E・doctor成功 |
-| 8 — Quest機能の拡張対応 | 完了（実機確認のみ保留） | haptic / hand / passthrough mock E2E、Quest EditMode 9/9、APK・release再生成、Phase 0〜7回帰成功 |
+| 8 — Quest機能の拡張対応 | 完了 | haptic / hand / passthrough mock E2E、Quest EditMode 9/9、Phase 0〜7回帰、Quest 3実機E2E成功 |
 
 ## Phase 0
 
@@ -196,9 +196,10 @@
   - Android OpenXR assetでMicrosoft Hand Interaction Profileは無効、XR Hands Hand Tracking Subsystemは有効であることを確認。
 - release / regression:
   - Phase 8 sourceを含むnative layer、APK、UPM tarball、checksum、VERSIONを再生成した。
-  - APK SHA-256 `51798579417bc867e1cd9c0b42c6299f5d6d498ba232feceaeae3803ad02f3ff`、UPM SHA-256 `981ce424f1604731512f88f332db63c1a2916ca8ff6a51cbcdca11a73a095a30`。
+  - 実機修正後のAPK SHA-256 `ea8f0ed6420dc0a4144b54e0357acbd430b3a0734e12076151434c1587a8f25a`、UPM SHA-256 `0d4a5284e9732a5247819cefc8df54a163d42e29f0ed9d2dc91a8f82d0a35518`。
   - `scripts/test_phase8.sh`: 成功。Phase 0〜7の全検証、release checksum、doctor error 0、repository外tarball Unity/Simulator E2Eが成功。
   - 最終出力は`Phase 0-8 regression passed (device result: 2)`。device result 2はQuest未接続の保留を表す。
 - Quest device E2E:
-  - Quest未接続のため、MediaCodec表示、実joint 60 Hz、Touch振動、Passthrough underlayの実機結果は保留。
-  - 接続後に`scripts/e2e_device.sh`を実行する。未接続時はexit 2で、他のPhase 8完了条件とは分離する。
+  - Quest 3 (`eureka`)をUSB接続し、`scripts/e2e_device.sh`が成功。
+  - 最終配布APKで`MAQUESTLINK_DEVICE_E2E_OK received_fps=74 decode_fps=76 pose_hz=73 capture_to_decode_ms=140.498283 hands_sent=2113 haptics_received=34 passthrough=1`。
+  - MediaCodec Surface release、world-fixed、clock sync、Pose / hand送信、Touch haptic command受信、Passthrough underlay設定を同時に確認した。装着時の見え方と振動体感は別途目視確認が必要。

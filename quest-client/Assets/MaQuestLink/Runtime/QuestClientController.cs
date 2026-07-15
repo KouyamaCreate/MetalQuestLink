@@ -23,15 +23,13 @@ namespace MaQuestLink.QuestClient
         private long previousDecoded;
         private long previousSent;
         private double captureToReceiveMs = -1.0;
+        private bool presenterErrorLogged;
 
         private void Awake()
         {
             Application.targetFrameRate = 72;
             ParseAndroidExtras();
-            if (presenter == null)
-            {
-                presenter = GetComponentInChildren<ExternalSurfacePresenter>();
-            }
+            ResolvePresenter();
             transport = new StreamTransport();
             decoder = new MediaCodecDecoder();
             haptics = new QuestHaptics();
@@ -80,6 +78,10 @@ namespace MaQuestLink.QuestClient
 
         private void Present(VideoFrame frame)
         {
+            if (!ResolvePresenter())
+            {
+                return;
+            }
             if (((VideoFrameFlags)frame.Flags & VideoFrameFlags.Passthrough) != 0 && !passthroughMode)
             {
                 passthroughMode = true;
@@ -122,7 +124,7 @@ namespace MaQuestLink.QuestClient
                 pose_hz = sent - previousSent,
                 dropped = transport.DroppedFrames,
                 low_latency = decoder.LowLatencyRequested,
-                reprojection = presenter.WorldFixed ? "world_fixed" : "head_fixed",
+                reprojection = ResolvePresenter() && presenter.WorldFixed ? "world_fixed" : "unavailable",
                 clock_synced = transport.HasClockSync,
                 clock_rtt_ms = transport.ClockRoundTripMs,
                 capture_to_receive_ms = captureToReceiveMs,
@@ -160,11 +162,34 @@ namespace MaQuestLink.QuestClient
 
         private void EnablePassthrough()
         {
+            if (!ResolvePresenter())
+            {
+                return;
+            }
             presenter.SetPassthroughApproximation(true);
             if (!PassthroughConfigurator.EnableUnderlay())
             {
                 Debug.LogWarning("MaQuestLink passthrough underlay could not be enabled");
             }
+        }
+
+        private bool ResolvePresenter()
+        {
+            if (presenter == null)
+            {
+                presenter = GetComponentInChildren<ExternalSurfacePresenter>(true);
+            }
+            if (presenter != null)
+            {
+                return true;
+            }
+            if (!presenterErrorLogged)
+            {
+                Debug.LogError(
+                    "MaQuestLink ExternalSurfacePresenter is missing from the Quest client scene");
+                presenterErrorLogged = true;
+            }
+            return false;
         }
 
         [Serializable]

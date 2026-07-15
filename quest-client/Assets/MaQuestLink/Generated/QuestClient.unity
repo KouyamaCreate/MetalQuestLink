@@ -599,7 +599,8 @@ MonoBehaviour:
   wifiFallbackHost:
   port: 42424
   diagnosticMode: 0
-  presenter: {fileID: 0}
+  passthroughMode: 0
+  presenter: {fileID: 904737030}
 --- !u!4 &1470498034
 Transform:
   m_ObjectHideFlags: 0

@@ -61,7 +61,7 @@
 - 接続候補は`127.0.0.1`（`adb reverse tcp:42424 tcp:42424`）を先に試し、指定されたWi-Fi hostへfallbackする。切断後は500 ms間隔で自動再接続する。
 - `adb shell am start` extrasでdiagnostic、host、Wi-Fi fallback、portを上書きできる。diagnostic modeは毎秒 `MAQUESTLINK_DIAGNOSTIC` JSONをlogcatへ出す。
 - `scripts/test_quest_client.sh` はXR非依存のprotocol/transportをEditModeで検証し、`scripts/build_quest_client.sh` はIL2CPP/ARM64 APKを生成する。
-- `scripts/e2e_device.sh` はinstall、adb reverse、無装着power automation、起動、Mac producer、logcat判定を自動化し、receive/decode 30 fps以上とPose送信60 Hz以上を要求する。
+- `scripts/e2e_device.sh` はinstall、adb reverse、無装着power automation、起動、Mac producer、logcat判定を自動化し、receive/decode 30 fps以上とPose送信60 Hz以上を要求する。実機入力modeは合成固定値を要求せず、Quest診断のpose / hand送信と接続後に再送するhapticで全二重経路を判定する。producer失敗時はMac側末尾と関連するQuest例外を表示する。
 
 ### Unityエディタ統合
 

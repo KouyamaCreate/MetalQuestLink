@@ -206,10 +206,18 @@ namespace MaQuestLink.QuestClient.Editor
             AddRequiredMetaComponent(rig, "OVRManager");
 
             var client = new GameObject("MaQuestLinkClient");
-            client.AddComponent<QuestClientController>();
             var screen = new GameObject("ExternalSurfaceStereoScreen");
             screen.transform.SetParent(client.transform, false);
-            screen.AddComponent<ExternalSurfacePresenter>();
+            var presenter = screen.AddComponent<ExternalSurfacePresenter>();
+            var controller = client.AddComponent<QuestClientController>();
+            var serializedController = new SerializedObject(controller);
+            var presenterProperty = serializedController.FindProperty("presenter");
+            if (presenterProperty == null)
+            {
+                throw new InvalidOperationException("Quest client presenter field was not found");
+            }
+            presenterProperty.objectReferenceValue = presenter;
+            serializedController.ApplyModifiedPropertiesWithoutUndo();
 
             if (!EditorSceneManager.SaveScene(scene, ScenePath))
             {

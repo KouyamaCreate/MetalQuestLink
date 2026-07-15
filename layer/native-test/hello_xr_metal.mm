@@ -68,6 +68,7 @@ struct SessionState {
 
 struct InputTest {
   bool enabled{};
+  bool synthetic{};
   XrPath left_path{XR_NULL_PATH};
   XrPath right_path{XR_NULL_PATH};
   XrActionSet action_set{XR_NULL_HANDLE};
@@ -87,6 +88,7 @@ struct InputTest {
   bool hand_verified{};
   bool haptic_applied{};
   bool haptic_stopped{};
+  std::uint64_t input_samples{};
 };
 
 [[nodiscard]] XrPosef identity_pose() {
@@ -109,8 +111,8 @@ struct InputTest {
   return action;
 }
 
-[[nodiscard]] InputTest create_input_test(XrInstance instance, bool enabled) {
-  InputTest test{.enabled = enabled};
+[[nodiscard]] InputTest create_input_test(XrInstance instance, bool enabled, bool synthetic) {
+  InputTest test{.enabled = enabled, .synthetic = synthetic};
   if (!enabled) {
     return test;
   }
@@ -218,8 +220,11 @@ void verify_input_state(XrSession session, XrSpace local_space, XrTime time,
   if (!test.enabled) {
     return;
   }
-  if (views.size() >= 2 && near((views[0].pose.position.x + views[1].pose.position.x) * 0.5F, 1.0F) &&
-      near(views[0].pose.position.y, 2.0F) && near(views[0].pose.position.z, 3.0F)) {
+  ++test.input_samples;
+  if (views.size() >= 2 &&
+      (!test.synthetic ||
+       (near((views[0].pose.position.x + views[1].pose.position.x) * 0.5F, 1.0F) &&
+        near(views[0].pose.position.y, 2.0F) && near(views[0].pose.position.z, 3.0F)))) {
     test.views_verified = true;
   }
 
@@ -244,20 +249,25 @@ void verify_input_state(XrSession session, XrSpace local_space, XrTime time,
                                           .action = test.thumbstick_action,
                                           .subactionPath = test.left_path};
     XrActionStateVector2f stick{.type = XR_TYPE_ACTION_STATE_VECTOR2F, .next = nullptr};
-    if (XR_SUCCEEDED(xrGetActionStateBoolean(session, &primary_info, &primary)) &&
-        XR_SUCCEEDED(xrGetActionStateFloat(session, &trigger_info, &trigger)) &&
-        XR_SUCCEEDED(xrGetActionStateVector2f(session, &stick_info, &stick)) &&
-        primary.isActive && primary.currentState && near(trigger.currentState, 0.75F) &&
-        near(stick.currentState.x, 0.25F) && near(stick.currentState.y, -0.5F)) {
+    const bool queried = XR_SUCCEEDED(xrGetActionStateBoolean(session, &primary_info, &primary)) &&
+                         XR_SUCCEEDED(xrGetActionStateFloat(session, &trigger_info, &trigger)) &&
+                         XR_SUCCEEDED(xrGetActionStateVector2f(session, &stick_info, &stick));
+    const bool expected = primary.isActive && primary.currentState &&
+                          near(trigger.currentState, 0.75F) &&
+                          near(stick.currentState.x, 0.25F) && near(stick.currentState.y, -0.5F);
+    if (queried && (!test.synthetic || expected)) {
       test.actions_verified = true;
     }
   }
 
   XrSpaceLocation location{.type = XR_TYPE_SPACE_LOCATION, .next = nullptr};
-  if (XR_SUCCEEDED(xrLocateSpace(test.left_action_space, local_space, time, &location)) &&
+  const bool space_located =
+      XR_SUCCEEDED(xrLocateSpace(test.left_action_space, local_space, time, &location));
+  const bool expected_space =
       (location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
       near(location.pose.position.x, -0.25F) && near(location.pose.position.y, 1.25F) &&
-      near(location.pose.position.z, -0.5F)) {
+      near(location.pose.position.z, -0.5F);
+  if (space_located && (!test.synthetic || expected_space)) {
     test.space_verified = true;
   }
 
@@ -275,14 +285,16 @@ void verify_input_state(XrSession session, XrSpace local_space, XrTime time,
       .baseSpace = local_space,
       .time = time,
   };
-  if (XR_SUCCEEDED(test.locate_hand_joints(test.left_hand_tracker, &hand_locate,
-                                            &hand_locations)) &&
+  const bool hand_located = XR_SUCCEEDED(test.locate_hand_joints(
+      test.left_hand_tracker, &hand_locate, &hand_locations));
+  const bool expected_hand =
       hand_locations.isActive &&
       (joints[XR_HAND_JOINT_INDEX_TIP_EXT].locationFlags &
        XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
       near(joints[XR_HAND_JOINT_INDEX_TIP_EXT].pose.position.x, -0.24F) &&
       near(joints[XR_HAND_JOINT_INDEX_TIP_EXT].pose.position.y, 1.12F) &&
-      near(joints[XR_HAND_JOINT_INDEX_TIP_EXT].radius, 0.008F)) {
+      near(joints[XR_HAND_JOINT_INDEX_TIP_EXT].radius, 0.008F);
+  if (hand_located && (!test.synthetic || expected_hand)) {
     test.hand_verified = true;
   }
 
@@ -292,7 +304,13 @@ void verify_input_state(XrSession session, XrSpace local_space, XrTime time,
       .action = test.haptic_action,
       .subactionPath = test.left_path,
   };
-  if (!test.haptic_applied && test.actions_verified) {
+  const bool apply_haptic = test.synthetic ? !test.haptic_applied && test.actions_verified
+                                           : test.actions_verified && test.input_samples % 120 == 1;
+  const bool stop_haptic = test.synthetic ? test.haptic_applied && !test.haptic_stopped
+                                          : test.actions_verified && test.input_samples % 120 == 2;
+  // A real Quest can finish launching after the native session starts. Retry only in the
+  // device test so at least one apply/stop pair crosses the established TCP connection.
+  if (apply_haptic) {
     const XrHapticVibration vibration{
         .type = XR_TYPE_HAPTIC_VIBRATION,
         .next = nullptr,
@@ -304,7 +322,7 @@ void verify_input_state(XrSession session, XrSpace local_space, XrTime time,
                                 reinterpret_cast<const XrHapticBaseHeader*>(&vibration)),
           "xrApplyHapticFeedback");
     test.haptic_applied = true;
-  } else if (test.haptic_applied && !test.haptic_stopped) {
+  } else if (stop_haptic) {
     check(xrStopHapticFeedback(session, &haptic_info), "xrStopHapticFeedback");
     test.haptic_stopped = true;
   }
@@ -338,7 +356,9 @@ void poll_events(XrInstance instance, XrSession session, SessionState& state) {
 
 int run(int argc, char** argv) {
   const int requested_frames = parse_frame_count(argc, argv);
-  const bool verify_input = std::getenv("MAQUESTLINK_VERIFY_INPUT") != nullptr;
+  const bool verify_synthetic_input = std::getenv("MAQUESTLINK_VERIFY_INPUT") != nullptr;
+  const bool verify_device_input = std::getenv("MAQUESTLINK_VERIFY_DEVICE_INPUT") != nullptr;
+  const bool verify_input = verify_synthetic_input || verify_device_input;
   const bool require_hands = std::getenv("MAQUESTLINK_REQUIRE_HANDS") != nullptr;
 
   std::uint32_t extension_count{};
@@ -374,7 +394,7 @@ int run(int argc, char** argv) {
 
   XrInstance instance{XR_NULL_HANDLE};
   check(xrCreateInstance(&instance_info, &instance), "xrCreateInstance");
-  InputTest input_test = create_input_test(instance, verify_input);
+  InputTest input_test = create_input_test(instance, verify_input, verify_synthetic_input);
 
   XrInstanceProperties instance_properties{.type = XR_TYPE_INSTANCE_PROPERTIES, .next = nullptr};
   check(xrGetInstanceProperties(instance, &instance_properties), "xrGetInstanceProperties");
@@ -638,14 +658,22 @@ int run(int argc, char** argv) {
     ++rendered_frames;
   }
 
-  if (verify_input && (!input_test.views_verified || !input_test.actions_verified ||
-                       !input_test.space_verified || (require_hands && !input_test.hand_verified) ||
-                       !input_test.haptic_applied || !input_test.haptic_stopped)) {
+  if (verify_synthetic_input &&
+      (!input_test.views_verified || !input_test.actions_verified ||
+       !input_test.space_verified || (require_hands && !input_test.hand_verified) ||
+       !input_test.haptic_applied || !input_test.haptic_stopped)) {
     throw std::runtime_error("synthetic input was not observed through all OpenXR APIs");
   }
-  if (verify_input) {
+  if (verify_synthetic_input) {
     std::cout << "MAQUESTLINK_INPUT_E2E_OK views=1 actions=1 space=1 hands="
               << input_test.hand_verified << " haptics=1\n";
+  }
+  if (verify_device_input &&
+      (!input_test.actions_verified || !input_test.haptic_applied || !input_test.haptic_stopped)) {
+    throw std::runtime_error("device input path did not complete OpenXR action and haptic calls");
+  }
+  if (verify_device_input) {
+    std::cout << "MAQUESTLINK_DEVICE_INPUT_E2E_OK actions=1 haptics=1\n";
   }
   if (input_test.left_hand_tracker != XR_NULL_HANDLE) {
     check(input_test.destroy_hand_tracker(input_test.left_hand_tracker),
