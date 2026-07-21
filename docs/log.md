@@ -1,5 +1,20 @@
 # 変更履歴
 
+## 2026-07-22 — Build Weekデモ映像 v5最終監査版
+
+- 映像、CG、カメラ、モーショングラフィクスのタイムラインは固定し、ナレーションを23個のshot-sized cueへ再編集した。各発話を対象カット到着後に開始し、関係のない次カットへ跨がない順序へ変更した。字幕JSONは実音声と同じ配置を使用する。
+- `FullDemoV4`と`FullDemoV5`からMOSS効果音の全参照を削除した。最終音声はQwen3-TTS合成ナレーションとACE-Step BGMの2レイヤーだけで、冒頭から末尾まで89秒のBGMを維持する。
+- Whisper逆文字起こしで、Unity/Quest hero 5–9秒、pipeline 21–26秒、Quest decode 38–42秒、package 56–63秒、compatibility/stack 69–76秒、OSS 82–86秒へ発話が収まることを確認した。5秒間隔Visionでも字幕と画面内容の対応を確認した。
+- 再生成後は89.000秒 / 2670フレーム、-16.01 LUFS-I / -3.94 dBTP。全フレームdecode、black/freeze 0件。字幕領域を除く上部900pxの旧visual lock比較はSSIM 0.998375。SHA-256は`e76b1b927a281c1bfb7dfc621f23a2ebe78c9ae9de2f1cfd6ea2d5c6cad6999c`。
+- 冒頭5秒へ実Unity Gameビュー収録を追加し、英語の`ACTUAL UNITY CAPTURE`と`PRESS PLAY. SEE IT MOVE.`で、Quest接続なしでもPlay中のsceneが動く事実を示した。後半84秒は7つのBlender CGと7つのRemotion情報章を交互に維持した。
+- Quest 3は監査済み元メッシュの頭頂・左右ストラップを完全復元し、左右各448面のレンズへ正方形寄りの同期映像を別々に割り当てた。Quest側とMac側のUSB-Cは開口へ密着させた。
+- MacBook前縁に残っていた重複カバー`CGV5_MacFrontRecess.001`だけをbounds検証後に削除し、実機形状に近い黒い指掛けrecessへ戻した。修正処理はsuffix付き全revisionを除去し、再実行可能にした。
+- 影響4区間をEEVEE Next 64 samples / 2560x1440 / 16-bit PNGで再レンダーし、1170枚の欠番、0-byte、旧時刻frameを0にした。39秒CGをLanczosで1080p化し、1秒間隔Visionでも形状、端子、レンズ、カメラ多様性を確認した。
+- Remotion V5を2670フレームで再生成し、ACE-Step 1.5 XL BGM、英語ナレーション、shot-aligned JSON字幕を統合した。最終masterを89.000秒、-16.01 LUFS-I / -3.94 dBTPにした。
+- 全2670フレームdecode、blackdetect 0件、1秒以上のfreeze 0件、1秒間隔duplicate 0件、3秒間隔Vision、冒頭0.5秒間隔、全15境界の前後frame、3系統の独立監査に合格した。映像監査結果は維持し、最終音声・字幕版のhashは上記へ更新した。
+
+理由: Questのストラップ欠落とMac前縁の不要な突起を完成版から除去し、89秒上限、製品形状、同期表示、カット連続性、音量、OSSクレジットを提出可能な証拠で確定するため。
+
 ## 2026-07-22 — Build Weekデモ映像 v4最終版
 
 - 39秒のBlender CGを7固有ショットへ再構成し、84秒の最終タイムラインでCGとRemotionを交互に配置した。各境界は直前の画面内移動ベクトルを引き継ぐ12フレームのdirectional handoffとcustom cubic Bézierで接続した。

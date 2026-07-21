@@ -3,6 +3,10 @@
 [English](README.md) | 日本語（このページ） | [コントリビューション](CONTRIBUTING.md) |
 [セキュリティ](SECURITY.md) | [Apache-2.0](LICENSE)
 
+[![MetalQuestLink — MacのUnity Play ModeをVRでテスト](docs/assets/metalquestlink-hero.png)](https://youtu.be/pVmj9CtD0LU)
+
+**[▶ MetalQuestLinkの89秒デモ映像をYouTubeで見る](https://youtu.be/pVmj9CtD0LU)**
+
 Apple Silicon MacのUnity Editor Play ModeをMeta Quest 3 / 3Sでプレビューするための開発ツールです。
 Meta XR SimulatorをMac側OpenXR runtimeとして使い、implicit OpenXR API layerが左右眼映像をQuestへ送り、
 QuestのHMD・Touch入力をUnityへ差し戻します。

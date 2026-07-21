@@ -3,6 +3,10 @@
 [日本語](README.ja.md) · [Documentation](docs/README.md) · [Contributing](CONTRIBUTING.md) ·
 [Security](SECURITY.md) · [Apache-2.0](LICENSE)
 
+[![MetalQuestLink — test Unity Play Mode in VR from a Mac](docs/assets/metalquestlink-hero.png)](https://youtu.be/pVmj9CtD0LU)
+
+**[▶ Watch the 89-second MetalQuestLink demo on YouTube](https://youtu.be/pVmj9CtD0LU)**
+
 Stream Unity Editor Play Mode from an Apple Silicon Mac to Meta Quest 3 or 3S without rebuilding
 an Android app for every iteration.
 

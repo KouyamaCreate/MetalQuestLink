@@ -58,6 +58,15 @@ Editor 9/9、PlayMode 1/1、Quest 12/12、repository外tarball Unity/Simulator E
 
 `shasum -a 256 -c SHA256SUMS`は全対象で成功した。
 
+Build Week提出動画は`demo-video/out/metalquestlink-demo-v5-final.mp4`。89.000秒 / 2670フレーム、
+1920x1080 / 30 fps、H.264 High + 48 kHz stereo AAC、-16.01 LUFS-I / -3.94 dBTP。
+冒頭はQuest接続を必要としない実Unity Gameビューで、後半はBlender CGとRemotion情報章を交互に構成した。
+Mac前縁の重複カバーを除去し、Questの完全なストラップ、両端子、左右レンズ表示を最終CGへ反映した。
+映像は固定したまま、ナレーションと字幕を23個のカット内cueへ同期した。効果音は全削除し、最終音声は
+Qwen3-TTS合成ナレーションとACE-Step BGMのみ。全フレームdecode、black/freeze、5秒間隔Vision、
+字幕領域外のvisual lock比較SSIM 0.998375を確認済み。SHA-256は
+`e76b1b927a281c1bfb7dfc621f23a2ebe78c9ae9de2f1cfd6ea2d5c6cad6999c`。
+
 ## できていないこと
 
 - Touch Plusの振動強度、周波数、duration停止の体感。

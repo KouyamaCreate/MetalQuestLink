@@ -13,7 +13,7 @@
 | 6 — 再投影・計測・ドキュメント | 完了 | world pose / clock unit 3/3、clock sync E2E、Phase 0〜5回帰成功 |
 | 7 — 配布パッケージング | 完了 | 配布4点・checksum・repository外tarball Unity/Simulator E2E・doctor成功 |
 | 8 — Quest機能の拡張対応 | 完了 | haptic / hand / passthrough mock E2E、Quest EditMode 9/9、Phase 0〜7回帰、Quest 3実機E2E成功 |
-| 9 — Build Week / Unity互換性 / OSS公開準備 | 進行中 | Public GitHub / v0.2.0 Release公開、Devpost 3/5。動画と最終提出が残る |
+| 9 — Build Week / Unity互換性 / OSS公開準備 | 進行中 | Public GitHub / v0.2.0 Release公開、89秒の提出動画完成。動画URL登録と最終提出が残る |
 
 ## Phase 9
 
@@ -25,9 +25,11 @@
 - `scripts/test_phase7_clean.sh`: repository外の一時projectでtarball解決、EditMode、Meta XR Simulator PlayMode、layer load、doctor error 0に成功。
 - GitHub Public repository `KouyamaCreate/MetalQuestLink`と、UPM tarball / APK / checksum付き`v0.2.0` Releaseを公開した。
 - Devpostの草稿名を`MetalQuestLink`へ統一し、repository URL、Release URL、`/feedback` Session ID、submitter type、居住国、Developer Tools向けテスト手順を保存した（3/5）。
-- `/feedback`欄には本体実装、OSS / submission、公開demo制作の3つのCodex Session IDを保存した。
+- `/feedback`欄には本体実装のCodex Session IDだけを保存し、OSS / submissionと公開demo制作の2件は審査員向け導入・test説明欄へ担当内容付きで保存した。
+- 3分未満の提出動画V5を完成。冒頭5秒はQuest不要の実Unity Gameビュー収録で、ブラウザやQuest utility画面を含めず、実機ミラーとは表記しない。後半84秒は7つのBlender CGカットと7つのRemotion情報章を交互に配置した。
+- 最終動画は`demo-video/out/metalquestlink-demo-v5-final.mp4`、89.000秒 / 2670フレーム、1920x1080 / 30 fps、H.264 High + 48 kHz stereo AAC。映像タイムラインは固定し、ナレーションと字幕を23個のカット内cueへ同期した。効果音は全削除し、音声は合成ナレーション + ACE-Step BGMのみ。-16.01 LUFS-I / -3.94 dBTP、全フレームdecode、black/freeze、Vision字幕対応、上部900pxのvisual lock比較SSIM 0.998375を確認。SHA-256 `e76b1b927a281c1bfb7dfc621f23a2ebe78c9ae9de2f1cfd6ea2d5c6cad6999c`。
 - GitHub-hosted `macos-15`の初回native CIは、AppleClang環境で`std::jthread` / `std::stop_token`が利用できず失敗した。local native回帰とは環境差があり、CI portability修正が残る。
-- 残り: 3分未満の公開YouTube/Vimeo URLを追加し、作者本人がRulesへ同意して最終提出する。
+- 残り: 完成済み動画をYouTube/Vimeoへ公開してURLを追加し、作者本人がRulesへ同意して最終提出する。
 
 ## Phase完了後の汎用パッケージ化
 
