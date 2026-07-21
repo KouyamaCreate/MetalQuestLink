@@ -28,6 +28,22 @@ low-latency preview target.
 - Capability-based project preflight instead of a hard dependency on one Unity patch release
 - A self-contained UPM tarball, Quest APK, checksums, doctor command, and clean-room package test
 
+## Built with Codex and GPT-5.6
+
+Codex with GPT-5.6 accelerated the repository-wide work: tracing native and Unity integration,
+removing patch-version assumptions, implementing Quick Setup and compatibility tests, and keeping
+the implementation, OSS documentation, and Devpost submission material aligned. Codex and GPT-5.6
+also helped produce the recent public demo video: building its capture scene and motion, shaping the
+under-three-minute edit and narration, and preparing the recording workflow and checklist.
+Architectural decisions, hardware results, the final edit, and submission choices remain
+human-reviewed and are recorded in this repository.
+
+Build Week Codex sessions:
+
+- `019f618b-15a8-7960-962b-7433a62ce98f` — core MetalQuestLink implementation and verification
+- `019f8322-1489-7022-b234-617ef5e38478` — Unity compatibility, installation, OSS, and submission work
+- `019f836b-b8d9-7da3-82f2-a3001423e828` — public demo video production
+
 ## Supported environment
 
 | Component | Support |

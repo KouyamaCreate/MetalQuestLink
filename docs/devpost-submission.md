@@ -44,8 +44,10 @@ and exposes a one-click setup flow.
 Codex with GPT-5.6 was used throughout the repository work: understanding the existing native and
 Unity integration, tracing version-coupled assumptions, implementing the compatibility matrix and
 quick setup flow, writing regression tests, and keeping setup, specification, and submission docs
-aligned. Key architectural decisions and measurements remain documented and human-verified in the
-repository.
+aligned. Codex and GPT-5.6 also helped produce the recent public demo video: building its capture
+scene and motion, shaping the under-three-minute edit and narration, and preparing the recording
+workflow and checklist. Key architectural decisions, measurements, the final edit, and submission
+choices remain documented and human-verified in the repository.
 
 ### Challenges
 
@@ -74,7 +76,18 @@ requests.
 - [x] Public repository URL: https://github.com/KouyamaCreate/MetalQuestLink
 - [ ] Confirm Apache-2.0 is the intended public license
 - [ ] Public YouTube demo URL under 3 minutes
-- [ ] `/feedback` Session ID for the main build task
-- [ ] Confirm submitter type and country of residence
+- [x] `/feedback` Session IDs for all three workspace histories:
+  - `019f618b-15a8-7960-962b-7433a62ce98f` — core implementation and verification
+  - `019f8322-1489-7022-b234-617ef5e38478` — compatibility, installation, OSS, and submission
+  - `019f836b-b8d9-7da3-82f2-a3001423e828` — public demo video production
+- [x] Submitter type `Individual` and country of residence `Japan` saved on Devpost
 - [x] Project name decided by the owner: `MetalQuestLink`
 - [ ] Final first-person edit of the description
+
+## Devpost status (2026-07-22)
+
+- Submission progress: 3/5 steps
+- Saved: project name `MetalQuestLink`, Developer Tools category, repository URL, release/test URL,
+  `/feedback` Session ID, supported platforms, installation and judge testing instructions
+- Remaining blocker: public YouTube/Vimeo demo URL under 3 minutes
+- Final submission and rules acceptance have not been performed

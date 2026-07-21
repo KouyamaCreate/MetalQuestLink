@@ -1,6 +1,6 @@
 # MetalQuestLink 最終レポート
 
-最終更新: 2026-07-21
+最終更新: 2026-07-22
 
 ## 結論
 
@@ -63,14 +63,19 @@ Editor 9/9、PlayMode 1/1、Quest 12/12、repository外tarball Unity/Simulator E
 - Touch Plusの振動強度、周波数、duration停止の体感。
 - 高負荷時の映像乱れを含む長時間性能測定と、未装着でscreen OFFになった場合の自動実機回帰。
 - Play中にeye texture解像度／codecを変更する動的decoder再構成。
-- Apple Developer ID署名／公証、GitHub公開／push、release tag、CI secrets設定。
+- Apple Developer ID署名／公証、CI secrets設定。
 
 シーンアンカー、空間メッシュ、アイ／フェイストラッキング、画素単位alphaは計画どおり対応外。
 
 ## ユーザーにしかできない残作業
 
 1. Touch Plusを用意できたら振動の強度、周波数、duration停止を体感確認する。
-2. 公開する場合は修正commitへ`v0.2.0` tagを付けてpushし、GitHub ActionsへUnity license secretsを設定する。必要ならユーザー所有のDeveloper IDで署名・公証する。
+2. Unity APK workflowを運用する場合はGitHub ActionsへUnity license secretsを設定する。必要ならユーザー所有のDeveloper IDで署名・公証する。
+
+公開リポジトリと配布物:
+
+- https://github.com/KouyamaCreate/MetalQuestLink
+- https://github.com/KouyamaCreate/MetalQuestLink/releases/tag/v0.2.0
 
 実機E2Eが失敗した場合は、出力された`build/phase4-device-logcat-*.log`と
 `build/phase4-device-producer-*.log`を確認する。

@@ -1,6 +1,6 @@
 # 実装進捗
 
-最終更新: 2026-07-21
+最終更新: 2026-07-22
 
 | Phase | 状態 | 検証 |
 |---|---|---|
@@ -13,7 +13,7 @@
 | 6 — 再投影・計測・ドキュメント | 完了 | world pose / clock unit 3/3、clock sync E2E、Phase 0〜5回帰成功 |
 | 7 — 配布パッケージング | 完了 | 配布4点・checksum・repository外tarball Unity/Simulator E2E・doctor成功 |
 | 8 — Quest機能の拡張対応 | 完了 | haptic / hand / passthrough mock E2E、Quest EditMode 9/9、Phase 0〜7回帰、Quest 3実機E2E成功 |
-| 9 — Build Week / Unity互換性 / OSS公開準備 | 進行中 | Unity 6000.2 / 6000.3 matrix成功、release smoke成功。2022.3はlicense未有効で保留 |
+| 9 — Build Week / Unity互換性 / OSS公開準備 | 進行中 | Public GitHub / v0.2.0 Release公開、Devpost 3/5。動画と最終提出が残る |
 
 ## Phase 9
 
@@ -23,8 +23,11 @@
 - `scripts/test_unity_matrix.sh`: Unity 6000.2.5f1 / 6000.3.6f1で成功。2022.3.44f1はlocal Editor licenseがなくtest開始前にblocked。
 - `scripts/test_phase7.sh`: 新しいEditor packageを含むtarball再生成、checksum、repository外展開、doctor error 0に成功。
 - `scripts/test_phase7_clean.sh`: repository外の一時projectでtarball解決、EditMode、Meta XR Simulator PlayMode、layer load、doctor error 0に成功。
-- Devpostの`Untitled`草稿を`MetalQuestLink`へ更新し、tagline、説明、Built withを保存した。hackathonへの最終submissionは未実施。
-- 残り: YouTube URLと最終確認を行い、Devpostへ提出する。repository URL、`/feedback` Session ID、submitter type、居住国は入力する。
+- GitHub Public repository `KouyamaCreate/MetalQuestLink`と、UPM tarball / APK / checksum付き`v0.2.0` Releaseを公開した。
+- Devpostの草稿名を`MetalQuestLink`へ統一し、repository URL、Release URL、`/feedback` Session ID、submitter type、居住国、Developer Tools向けテスト手順を保存した（3/5）。
+- `/feedback`欄には本体実装、OSS / submission、公開demo制作の3つのCodex Session IDを保存した。
+- GitHub-hosted `macos-15`の初回native CIは、AppleClang環境で`std::jthread` / `std::stop_token`が利用できず失敗した。local native回帰とは環境差があり、CI portability修正が残る。
+- 残り: 3分未満の公開YouTube/Vimeo URLを追加し、作者本人がRulesへ同意して最終提出する。
 
 ## Phase完了後の汎用パッケージ化
 

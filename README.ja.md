@@ -11,6 +11,19 @@ QuestのHMD・Touch入力をUnityへ差し戻します。
 ハンドトラッキング・パススルー・通信ハプティクス経路を検証済みです。詳細は
 [実装進捗](docs/progress.md) を参照してください。
 
+## CodexとGPT-5.6の利用範囲
+
+Codex with GPT-5.6を、native / Unity統合の調査、patch version依存の削減、Quick Setupと互換性testの実装、
+実装・OSS文書・Devpost提出資料の同期に利用しました。公開する直近のデモ映像もCodex / GPT-5.6と共同制作し、
+capture用sceneとmotionの作成、3分未満の編集構成とnarration、収録workflowとchecklistの準備に利用しています。
+architecture上の判断、実機結果、最終編集、提出内容は人間が確認し、このrepositoryへ記録しています。
+
+Build Weekで使用したCodex Session ID:
+
+- `019f618b-15a8-7960-962b-7433a62ce98f` — MetalQuestLink本体の実装と検証
+- `019f8322-1489-7022-b234-617ef5e38478` — Unity互換性、導入、OSS、提出準備
+- `019f836b-b8d9-7da3-82f2-a3001423e828` — 公開デモ映像制作
+
 ## 利用に必要なもの
 
 - Apple Silicon Mac（arm64）
