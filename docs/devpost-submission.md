@@ -76,8 +76,8 @@ requests.
 - [x] Public repository URL: https://github.com/KouyamaCreate/MetalQuestLink
 - [ ] Confirm Apache-2.0 is the intended public license
 - [ ] Public YouTube demo URL under 3 minutes
-- [x] `/feedback` Session IDs for all three workspace histories:
-  - `019f618b-15a8-7960-962b-7433a62ce98f` — core implementation and verification
+- [x] `/feedback` Session ID: `019f618b-15a8-7960-962b-7433a62ce98f` — core implementation and verification
+- [x] Additional Codex sessions recorded in the judge-only installation/testing notes:
   - `019f8322-1489-7022-b234-617ef5e38478` — compatibility, installation, OSS, and submission
   - `019f836b-b8d9-7da3-82f2-a3001423e828` — public demo video production
 - [x] Submitter type `Individual` and country of residence `Japan` saved on Devpost
