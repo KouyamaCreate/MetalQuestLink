@@ -1,0 +1,18 @@
+{
+  "file_format_version": "1.0.0",
+  "api_layer": {
+    "name": "XR_APILAYER_METALQUESTLINK_streaming",
+    "library_path": "libmetalquestlink_openxr_layer.so",
+    "api_version": "1.0",
+    "implementation_version": "1",
+    "description": "MetalQuestLink OpenXR streaming layer",
+    "instance_extensions": [
+      {
+        "name": "XR_EXT_hand_tracking",
+        "extension_version": "4"
+      }
+    ],
+    "enable_environment": "METALQUESTLINK_ENABLE_API_LAYER",
+    "disable_environment": "METALQUESTLINK_DISABLE_API_LAYER"
+  }
+}

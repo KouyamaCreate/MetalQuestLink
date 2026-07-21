@@ -1,11 +1,11 @@
-#include "maquestlink/protocol.hpp"
+#include "metalquestlink/protocol.hpp"
 
 #include <bit>
 #include <limits>
 #include <string>
 #include <type_traits>
 
-namespace maquestlink::protocol {
+namespace metalquestlink::protocol {
 namespace {
 
 template <typename T, bool = std::is_enum_v<T>>
@@ -383,4 +383,4 @@ Message deserialize(std::span<const std::byte> bytes) {
   };
 }
 
-}  // namespace maquestlink::protocol
+}  // namespace metalquestlink::protocol

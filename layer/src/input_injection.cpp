@@ -15,12 +15,12 @@
 #include <utility>
 #include <vector>
 
-#include "maquestlink/protocol.hpp"
+#include "metalquestlink/protocol.hpp"
 #include "transport.hpp"
 
 namespace {
 
-namespace protocol = maquestlink::protocol;
+namespace protocol = metalquestlink::protocol;
 
 enum class Side { None, Left, Right };
 enum class Component {

@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j "${MAQUESTLINK_BUILD_JOBS:-8}"
+cmake --build build -j "${METALQUESTLINK_BUILD_JOBS:-8}"
 ctest --test-dir build --output-on-failure
 scripts/test_phase1.sh
 scripts/test_phase2.sh

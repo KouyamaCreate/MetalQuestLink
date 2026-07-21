@@ -9,7 +9,7 @@ using UnityEditor.XR.OpenXR.Features;
 using UnityEngine;
 using UnityEngine.XR.Management;
 
-namespace MaQuestLink.Editor
+namespace MetalQuestLink.Editor
 {
     [InitializeOnLoad]
     public static class StandaloneOpenXRConfigurator
@@ -89,7 +89,7 @@ namespace MaQuestLink.Editor
                         manager, OpenXRLoaderType, BuildTargetGroup.Standalone))
                 {
                     throw new InvalidOperationException(
-                        "Standalone OpenXR loader could not be assigned. Reimport the MaQuestLink package.");
+                        "Standalone OpenXR loader could not be assigned. Reimport the MetalQuestLink package.");
                 }
                 existingLoaders = manager.activeLoaders.Where(loader => loader != null).ToList();
                 var openXrLoader = existingLoaders.FirstOrDefault(
@@ -118,7 +118,7 @@ namespace MaQuestLink.Editor
             AssetDatabase.SaveAssets();
             if (changed)
             {
-                Debug.Log("MAQUESTLINK_STANDALONE_OPENXR_CONFIGURED loader=OpenXR touch=1 metaFeatureSet=1");
+                Debug.Log("METALQUESTLINK_STANDALONE_OPENXR_CONFIGURED loader=OpenXR touch=1 metaFeatureSet=1");
             }
             return changed;
         }
@@ -140,7 +140,7 @@ namespace MaQuestLink.Editor
 
         private static void ConfigureOnLoad()
         {
-            if (!MaQuestLinkSettings.instance.autoConfigureStandaloneOpenXR ||
+            if (!MetalQuestLinkSettings.instance.autoConfigureStandaloneOpenXR ||
                 EditorApplication.isCompiling || EditorApplication.isUpdating ||
                 EditorApplication.isPlayingOrWillChangePlaymode)
             {
@@ -152,7 +152,7 @@ namespace MaQuestLink.Editor
             }
             catch (Exception exception)
             {
-                Debug.LogError("MAQUESTLINK_STANDALONE_OPENXR_SETUP_FAILED " + exception.Message);
+                Debug.LogError("METALQUESTLINK_STANDALONE_OPENXR_SETUP_FAILED " + exception.Message);
             }
         }
 

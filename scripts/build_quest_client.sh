@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 UNITY="${UNITY:-/Applications/Unity/Hub/Editor/6000.3.6f1/Unity.app/Contents/MacOS/Unity}"
-LOG="${MAQUESTLINK_UNITY_LOG:-$ROOT_DIR/quest-client/Builds/build.log}"
-META_CORE_LOCAL="${MAQUESTLINK_META_CORE_LOCAL:-/private/tmp/meta-xr-core-203-full/package}"
+LOG="${METALQUESTLINK_UNITY_LOG:-$ROOT_DIR/quest-client/Builds/build.log}"
+META_CORE_LOCAL="${METALQUESTLINK_META_CORE_LOCAL:-/private/tmp/meta-xr-core-203-full/package}"
 MANIFEST="$ROOT_DIR/quest-client/Packages/manifest.json"
 LOCK="$ROOT_DIR/quest-client/Packages/packages-lock.json"
 MANIFEST_BACKUP="$ROOT_DIR/quest-client/Builds/build-manifest.json"
@@ -34,8 +34,8 @@ UNITY="$UNITY" "$ROOT_DIR/scripts/build_quest_projection.sh"
   -quit \
   -projectPath "$ROOT_DIR/quest-client" \
   -buildTarget Android \
-  -executeMethod MaQuestLink.QuestClient.Editor.BuildQuestClient.Build \
+  -executeMethod MetalQuestLink.QuestClient.Editor.BuildQuestClient.Build \
   -logFile "$LOG"
 
-test -s "$ROOT_DIR/quest-client/Builds/MaQuestLink.apk"
-echo "MaQuestLink APK: $ROOT_DIR/quest-client/Builds/MaQuestLink.apk"
+test -s "$ROOT_DIR/quest-client/Builds/MetalQuestLink.apk"
+echo "MetalQuestLink APK: $ROOT_DIR/quest-client/Builds/MetalQuestLink.apk"

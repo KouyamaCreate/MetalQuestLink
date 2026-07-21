@@ -22,11 +22,11 @@
 #include <thread>
 #include <vector>
 
-#include "maquestlink/protocol.hpp"
+#include "metalquestlink/protocol.hpp"
 
 namespace {
 
-namespace protocol = maquestlink::protocol;
+namespace protocol = metalquestlink::protocol;
 
 struct Options {
   int frames{120};
@@ -85,7 +85,7 @@ struct Options {
     ::close(socket_fd);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
-  throw std::runtime_error("timed out connecting to MaQuestLink layer");
+  throw std::runtime_error("timed out connecting to MetalQuestLink layer");
 }
 
 [[nodiscard]] protocol::Pose synthetic_pose(float x, float y, float z) {
@@ -449,7 +449,7 @@ int run(int argc, char** argv) {
       throw std::runtime_error("layer did not mark passthrough projection frames");
     }
   }
-  std::cout << "MAQUESTLINK_VIDEO_E2E_OK received=" << received << " decoded=" << decoded
+  std::cout << "METALQUESTLINK_VIDEO_E2E_OK received=" << received << " decoded=" << decoded
             << " fps=" << fps << " width=" << width << " height=" << height
             << " input_sent=" << sent_input.load() << " clock_sync=" << clock_sync
             << " haptic_apply=" << haptic_apply << " haptic_stop=" << haptic_stop
@@ -469,7 +469,7 @@ int main(int argc, char** argv) {
     try {
       return run(argc, argv);
     } catch (const std::exception& error) {
-      std::cerr << "maquestlink_mock_viewer: " << error.what() << '\n';
+      std::cerr << "metalquestlink_mock_viewer: " << error.what() << '\n';
       return 1;
     }
   }

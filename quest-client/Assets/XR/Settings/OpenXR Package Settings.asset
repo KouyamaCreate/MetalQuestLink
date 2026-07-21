@@ -1774,13 +1774,13 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1f7a813e745f4f3aa54f83153416c835, type: 3}
   m_Name: ImmersiveProjectionFeature Android
-  m_EditorClassIdentifier: MaQuestLink.QuestClient::MaQuestLink.QuestClient.ImmersiveProjectionFeature
+  m_EditorClassIdentifier: MetalQuestLink.QuestClient::MetalQuestLink.QuestClient.ImmersiveProjectionFeature
   m_enabled: 1
-  nameUi: MaQuestLink Immersive Projection
-  version: 0.1.0
-  featureIdInternal: com.maquestlink.openxr.feature.immersiveprojection
+  nameUi: MetalQuestLink Immersive Projection
+  version: 0.2.0
+  featureIdInternal: com.metalquestlink.openxr.feature.immersiveprojection
   openxrExtensionStrings: XR_KHR_android_surface_swapchain XR_KHR_composition_layer_color_scale_bias
-  company: MaQuestLink
+  company: MetalQuestLink
   priority: 0
   required: 0
 --- !u!114 &8196745176103030070
@@ -1902,7 +1902,6 @@ MonoBehaviour:
   - {fileID: -7465893580016127777}
   - {fileID: 4999568698142958828}
   - {fileID: 7294644489008372909}
-  - {fileID: 7859506150069760227}
   - {fileID: -3139615283051569475}
   - {fileID: 524803391249031993}
   - {fileID: -230958318631343534}
@@ -1923,6 +1922,7 @@ MonoBehaviour:
   - {fileID: 836963369663952735}
   - {fileID: -6680524536367027164}
   - {fileID: 106459983283216081}
+  - {fileID: 7859506150069760227}
   - {fileID: -1922369955889485483}
   - {fileID: 5608811054047092808}
   - {fileID: -2303893972766046794}

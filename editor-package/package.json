@@ -1,14 +1,14 @@
 {
-  "name": "com.maquestlink.editor",
-  "version": "0.1.0",
-  "displayName": "MaQuestLink Editor",
-  "description": "Editor setup and diagnostics for streaming Meta XR Simulator play mode to Quest.",
-  "unity": "6000.2",
+  "name": "com.metalquestlink.editor",
+  "version": "0.2.0",
+  "displayName": "MetalQuestLink Editor",
+  "description": "Version-tolerant Editor setup and diagnostics for streaming Meta XR Simulator play mode to Quest.",
+  "unity": "2022.3",
   "dependencies": {
-    "com.unity.xr.management": "4.5.1",
-    "com.unity.xr.openxr": "1.15.1"
+    "com.unity.xr.management": "4.4.0",
+    "com.unity.xr.openxr": "1.8.2"
   },
   "author": {
-    "name": "MaQuestLink"
+    "name": "MetalQuestLink"
   }
 }

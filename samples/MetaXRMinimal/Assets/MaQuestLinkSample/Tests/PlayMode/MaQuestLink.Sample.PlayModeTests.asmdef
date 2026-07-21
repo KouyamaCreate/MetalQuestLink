@@ -1,7 +1,0 @@
-{
-  "name": "MaQuestLink.Sample.PlayModeTests",
-  "rootNamespace": "MaQuestLink.Sample.Tests",
-  "references": ["Oculus.VR"],
-  "includePlatforms": [],
-  "optionalUnityReferences": ["TestAssemblies"]
-}

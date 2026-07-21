@@ -1,11 +1,11 @@
-# MaQuestLink 最終レポート
+# MetalQuestLink 最終レポート
 
-最終更新: 2026-07-15
+最終更新: 2026-07-21
 
 ## 結論
 
 Phase 0〜8の実装、実機不要の全回帰、Quest 3実機E2Eが完了した。
-最終配布APKの実機結果は`MAQUESTLINK_DEVICE_E2E_OK`。映像受信74 fps、decode 76 fps、Pose 73 Hz、
+最終配布APKの実機結果は`METALQUESTLINK_DEVICE_E2E_OK`。映像受信74 fps、decode 76 fps、Pose 73 Hz、
 capture-to-decode 140.498283 ms、hand message 2,113件、haptic 34件、immersive projection / clock sync / Passthroughを同時に確認した。
 追加の装着テストでは左右52関節の追跡、診断hand skeletonの指開閉、Passthrough表示を目視確認した。
 その後、有限QuadをOpenXR stereo projectionへ置き換え、Quest 3装着時に視野全体を覆う一人称表示も目視確認した。
@@ -49,12 +49,12 @@ Editor 9/9、PlayMode 1/1、Quest 12/12、repository外tarball Unity/Simulator E
 
 ## 配布物
 
-`dist/`の最終4点:
+`dist/`のMetalQuestLink 0.2.0最終4点:
 
-- `com.maquestlink.editor-0.1.0.tgz` — 38,604,129 bytes — SHA-256 `d5cd3157dbfdc9a24b1daeb0a8c8957c77d69f0814bb21285e4e6b734d87ddec`
-- `MaQuestLink-0.1.0.apk` — 43,721,395 bytes — SHA-256 `89807c07b119cfc98f522a30e387e61efd4c766257e77447f65647b7d35b6855`
+- `com.metalquestlink.editor-0.2.0.tgz` — 38,608,114 bytes — SHA-256 `31c102cc98d48ea2bb2ab3dbcd80f3e270c3858ef54849c1ca7a58c72ab0e5b2`
+- `MetalQuestLink-0.2.0.apk` — 43,721,918 bytes — SHA-256 `93a608f7540776e24646cf7cf3629ad1cb474b56f39537706254e8bfb6a80bb2`
 - `SHA256SUMS`
-- `VERSION` (`0.1.0`)
+- `VERSION` (`0.2.0`)
 
 `shasum -a 256 -c SHA256SUMS`は全対象で成功した。
 
@@ -70,7 +70,7 @@ Editor 9/9、PlayMode 1/1、Quest 12/12、repository外tarball Unity/Simulator E
 ## ユーザーにしかできない残作業
 
 1. Touch Plusを用意できたら振動の強度、周波数、duration停止を体感確認する。
-2. 公開する場合は修正commitへ`v0.1.0` tagを付けてpushし、GitHub ActionsへUnity license secretsを設定する。必要ならユーザー所有のDeveloper IDで署名・公証する。
+2. 公開する場合は修正commitへ`v0.2.0` tagを付けてpushし、GitHub ActionsへUnity license secretsを設定する。必要ならユーザー所有のDeveloper IDで署名・公証する。
 
 実機E2Eが失敗した場合は、出力された`build/phase4-device-logcat-*.log`と
 `build/phase4-device-producer-*.log`を確認する。

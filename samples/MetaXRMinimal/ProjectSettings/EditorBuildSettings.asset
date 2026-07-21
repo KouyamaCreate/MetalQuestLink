@@ -6,7 +6,7 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/MaQuestLinkSample/Scenes/Minimal.unity
+    path: Assets/MetalQuestLinkSample/Scenes/Minimal.unity
     guid: 8f980e2fd276e4a59bb225b00f82dab0
   m_configObjects:
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: 4885e537a7b174cb3bcc8390a8e517a7, type: 2}

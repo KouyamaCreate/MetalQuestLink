@@ -1,5 +1,45 @@
 # 調査・設計メモ
 
+## 2026-07-22 — デモ映像v4の同期画面・端子・カット接続設計
+
+- Imagen生成のUnity Editor UIは外枠、Hierarchy、Inspector、toolbarを保持し、中央viewport (`x=343, y=96, w=944, h=507` on 1672x941 source) だけへ動画を合成する。Play前は生成still、Play後だけ共有XR masterを表示する。
+- `XRMonoV4` と `VRRenderV4` は同じReact scene定義を使う。Quest版だけ左右眼へ±3pxの視差を加え、1920x1080 SBSの左右halfへ一眼ずつ配置する。BlenderのMac画面とQuest物理レンズは39秒・1170フレームの同一時刻masterを非循環再生する。
+- Quest USB-Cは前から見て右側の楕円リセス内スロットへ合わせる。最終注視点は概ね `(0.268965, -0.0905, 0.0803)`、黒いplug bodyの内面をリセス外周まで寄せ、金属舌部を内側へ貫入させる。偽のport recess meshは追加しない。
+- ケーブルはMacから手前床面を通り、Quest右外周からスロットへ戻る。前面を横切らせない。端子マクロでは小型emissive packetをMac→Quest方向へ流すが、接触面を隠さない大きさに制限する。
+- 39秒CGは7固有shot。Play中心へのpush、USB-C進入macro、Quest receive、唯一のlens interior、Mac→Quest rack focus、counter-orbit resolveを使う。製品rootは接続姿勢で固定し、動きはcameraへ担わせる。
+- 84秒finalはCGとRemotionを必ず交互に配置する。各境界は前後のscreen-space移動方向を引き継ぐ12-frame directional light sweepと同じcubic Bézierでつなぎ、無関係なflash cutにしない。
+- 字幕は`Caption`互換JSONをsource of truthとし、英語ナレーションへ16 cueを割り当てる。モーショングラフィクス下部注記を隠さないよう字幕は最下部safe areaへ置く。
+
+## 2026-07-22 — デモ映像v3の画面・接続・レンダー設計
+
+- 画面上の三角形はimagegen画像ではなく、旧Blenderオブジェクト`UNITY_PLAY_TRIANGLE`だった。Mac rootの子孫保持処理より前に名前prefixで削除しないと再生成後も残る。
+- Unity画面は追加平面をMacBookへ重ねず、`abgVijaHVNRUvcc`の専用UV `CGV3_UnityScreenUV`へ直接貼る。物理ノッチを避けるため16:9画像をパネル下側92.5%へfitする。
+- Quest本体だけを最終カットで回転するとworld-spaceのUSB-C端子から離れて見える。接続を見せる841〜945フレームではQuestを接続姿勢に固定し、動きはカメラへ担わせる。
+- 左右レンズは単一SBS画像を上下へ重ねず、UVのU範囲を0〜0.5 / 0.5〜1.0へ分け、左右の独立したレンズ面へ割り当てる。
+- 1440pから1080pへのLanczos縮小は、納期内のEEVEE動画で64 samplesを維持しながら細いケーブル編組、製品輪郭、DOF境界のaliasingを抑える妥協点とした。
+- v3ではSFXを使わない。ナレーションは0〜83.52秒を連続再生し、BGMだけを映像の章立てと最終resolveへ合わせる。
+
+## 2026-07-21 — デモ映像v2のレンズ・接地設計
+
+- MacBookの手動Z位置は最下点が床から18mm浮いていた。親rootの見かけ座標ではなく全子メッシュのworld boundsを評価し、0.8mm clearanceへ補正する。
+- Sketchfab Questは`Object_4`単一メッシュ・単一材だが、左右の中央レンズは独立した各448面の連結成分として識別できる。追加表示板より、専用UVをworld X/Zで0〜1正規化して動画材を直接割り当てる方が外形と遮蔽を保持できる。
+- 元のatlas UVでは動画全体がレンズへ収まらないため、`CGV2_LensMovieUV`を追加する。左右眼は同じ対称VR環境を使い、小さい水平差だけ残す。
+- 後部ストラップは正面寄りの望遠でレンズを横切る。レンズ中心より約10mm低い20〜24mm近接広角にすると、ストラップを上側へ逃がしながら両眼を同時に見せられる。
+- `AbsoluteFill`は既定のflex directionがcolumnなので、左右眼コンテナでは`flexDirection: row`を明示する。未指定だと上下積みの映像を左右cropしてしまい、一眼内に横長画像が縦方向へ並んだように見える。
+- 最終内部カメラは24〜26mm、レンズ面から約125〜200mmの正対超近接とした。これにより大きく上へ曲がる外側ストラップをcropし、レンズ周辺の水平なフェイスインターフェースを画面基準にできる。
+- ケーブルの芯と編組を別々の補間方式で作ると二重経路に分離したため、両方を同じCatmull-Romサンプル列へ統一した。Mac側は元メッシュのUSB-C開口中心、Quest側は側面の80-face開口成分へ端子を置いた。
+- M4 ProでのCycles 64 samples実測は約35秒/フレームで全尺約21時間となる。動きのある全2160フレームはEEVEE Next 64 samples、16-bit PNG、AgXを採用し、製品形状・動画材・カメラのVision QAを優先した。
+
+## 2026-07-21 — Unity互換性とOpenAI Build Week準備
+
+- Quest client source projectは再現可能APK buildのためUnity / Meta XR packageを固定したままにする。利用者が導入するEditor packageとは依存範囲を分離する。
+- Editor packageは2022.3 LTSをresolver baselineとするが、実機streamの既存検証値は6000.2 / 6000.3由来。2022.3 matrixはlocal Editor license未有効でblockedしたため、対応baselineとverifiedを区別して記録する。
+- OpenAI Build WeekのDeveloper Tools要件に対し、prebuilt tarball / APK、対応platform、再build不要のjudge test path、Codex / GPT-5.6活用記録を用意した。
+- Devpost最終提出にはpublic repository URL、YouTube URL、`/feedback` Session ID、submitter type、居住国が必要。これらは推測せずowner入力を待つ。
+- Apache-2.0のcopyright表示は`MetalQuestLink contributors`を仮置きした。公開前に権利者表記を確認する。
+- 英語圏で用途を想起しやすくするため、ユーザー判断で名称を`MetalQuestLink`へ変更した。`Metal`はmacOS側のcapture経路、`Quest`は対象headset、`Link`はEditorとheadsetの双方向接続を表す。
+- renameはpackage ID、Android application ID、layer、wire magic、環境変数、binary、release名まで全面適用する。0.1.xとの部分混在は対応せず、0.2.0をbreaking releaseとする。
+
 ## 2026-07-15 — Phase 0
 
 - wire formatはC++/C#/Java間で再現しやすい固定幅little-endianとした。
@@ -26,7 +66,7 @@
 - macOSのAPI layer探索はXDG/Unix系の探索処理を使う。implicit suffixは `openxr/1/api_layers/implicit.d`、explicit suffixは `openxr/1/api_layers/explicit.d`。
 - 標準候補は `/etc`、`/usr/local/share`、`/usr/share`、`$HOME/.local/share` とXDG環境変数由来のパス。
 - `XR_API_LAYER_PATH` はexplicit layerだけを上書きする。implicit layerの検証には `XDG_DATA_HOME=<repo>/build` と `build/openxr/1/api_layers/implicit.d` を使った。
-- `MAQUESTLINK_ENABLE_API_LAYER=1` でmanifestが有効になり、loader logに `succeeded loading layer XR_APILAYER_MAQUESTLINK_streaming` が出た。
+- `METALQUESTLINK_ENABLE_API_LAYER=1` でmanifestが有効になり、loader logに `succeeded loading layer XR_APILAYER_METALQUESTLINK_streaming` が出た。
 - 一次資料: [OpenXR loader design](https://registry.khronos.org/OpenXR/specs/1.1/loader.html)、Khronos source `src/loader/manifest_file.cpp` / `src/common/platform_utils.hpp`。
 
 ### Metal拡張
@@ -112,8 +152,8 @@
 ### デコードと診断
 
 - MediaCodecはH.264 `video/avc` またはHEVC `video/hevc`、`low-latency=1`、priority 0を要求する。端末がlow-latency keyを拒否した場合は同じSurfaceへ通常modeで再configureする。
-- `MAQUESTLINK_DIAGNOSTIC` にconnected、累積received/decoded/poses、1秒区間のreceive/decode fps・pose Hz、drop数、low-latency要求結果をJSON出力する。
-- Android extrasは `maquestlink_diagnostic`、`maquestlink_host`、`maquestlink_wifi_host`、`maquestlink_port`。
+- `METALQUESTLINK_DIAGNOSTIC` にconnected、累積received/decoded/poses、1秒区間のreceive/decode fps・pose Hz、drop数、low-latency要求結果をJSON出力する。
+- Android extrasは `metalquestlink_diagnostic`、`metalquestlink_host`、`metalquestlink_wifi_host`、`metalquestlink_port`。
 
 ### 検証結果と未実測
 
@@ -127,7 +167,7 @@
 
 - Unity 6000.3.6f1 PlayModeからMeta XR Simulator 201.0.0へ接続し、OVRPluginの`CompositorOpenXR::Initialize()`成功とMetal `XrSession`作成を確認した。
 - layer logはapplication名 `Oculus VR Plugin (Unity 6000.3.6f1 [Editor])` と `Unity Application` のinstance load / destroyを記録した。
-- Unity OpenXR diagnostic reportにも `XR_APILAYER_MAQUESTLINK_streaming` が列挙された。
+- Unity OpenXR diagnostic reportにも `XR_APILAYER_METALQUESTLINK_streaming` が列挙された。
 - Quest未接続時のstatus JSONは `connected=false`、encoded frames / fps / copy / encode / pipelineが0。PlayMode testはこの接続待ち状態を確認した。
 - PlayMode E2Eへ `-nographics` を付けるとNull graphics deviceとなり、`xrCreateSession` が `XR_ERROR_GRAPHICS_DEVICE_INVALID` を返す。Meta XR SimulatorのMetal sessionを検証するrunではgraphics deviceを有効にする必要がある。
 
@@ -170,14 +210,14 @@
 
 - `OpenXRLayerInstaller`の探索先をpackage内`Native~/macOS`と`QuestClient~`だけに限定した。repository内buildへのfallbackはない。
 - 同梱layerはMach-O bundle arm64、760 KiB。`codesign --verify --strict`でad-hoc署名を確認した。
-- 同梱APKは42 MiB。Unity SDKの`aapt`でpackage `com.maquestlink.questclient`、version `0.1.0`を確認した。
+- 同梱APKは42 MiB。Unity SDKの`aapt`でpackage `com.metalquestlink.questclient`、version `0.1.0`を確認した。
 - UPM tarballは約37 MiB。repository外へ展開したpackageにnative layer、manifest、APKがあり、source textにrepository build path依存がないことを確認した。
 
 ### release / doctor
 
 - `scripts/test_phase7.sh`はUPM tarball、standalone APK、VERSIONのSHA-256を生成直後と展開前に検証して成功した。
 - repository外packageを対象に`doctor.sh --register`を実行し、error 0。Apple Silicon、macOS 26.4.1、layer architecture / signature、package/APK version、manifest、Meta XR Simulator、adbを確認した。
-- Simulator停止とQuest未接続は利用準備を妨げないため警告。Quest接続時は端末上の`com.maquestlink.questclient` versionもpackage versionと比較する。
+- Simulator停止とQuest未接続は利用準備を妨げないため警告。Quest接続時は端末上の`com.metalquestlink.questclient` versionもpackage versionと比較する。
 - `scripts/test_phase7_clean.sh`はtarballだけを参照するrepository外の一時Unity sampleを作り、EditMode / Meta XR Simulator PlayMode、layer load、接続待ち、doctor error 0を確認して成功した。
 - 初回実行では過去の並行batchmode実行が残したorphanのUnity Licensing ClientによりIPC再接続が停止した。stale processだけを終了し、license cacheは変更せず再実行して成功した。
 
@@ -195,7 +235,7 @@
 - Unity OpenXRのMicrosoft Hand Interaction ProfileとXR Hands Hand Tracking Subsystemは同じfeature ID `com.unity.openxr.feature.input.handtracking`を持つ。ID検索では前者を誤選択したため、build設定は`UnityEngine.XR.Hands.OpenXR.HandTracking`型で後者を選ぶ。生成したAndroid assetで前者0、後者1を確認した。
 - XR Hands joint IDはPalm / WristだけOpenXR順とUnity enum値が逆で、それ以降はOpenXR index + 1。unit testでPalm 0→2、Wrist 1→1、index 10→11を固定した。
 - layer manifestの`instance_extensions`で`XR_EXT_hand_tracking`をloader列挙へ追加し、system support、create/locate/destroyをhookする。mock 26関節がnative testの`xrLocateHandJointsEXT`へ反映され、`hands=1`を確認した。
-- 基本joint取得に`XR_FB_hand_tracking_aim`などのMeta追加拡張は不要。Meta aim gestureやmeshは提供していないため、それらを要求するアプリはMaQuestLink経由では利用できない。
+- 基本joint取得に`XR_FB_hand_tracking_aim`などのMeta追加拡張は不要。Meta aim gestureやmeshは提供していないため、それらを要求するアプリはMetalQuestLink経由では利用できない。
 
 ### パススルー近似
 
@@ -233,7 +273,7 @@
 - 既存のworld-fixed Quadはcompositor再投影されても有限平面であり、視野周辺に板の境界が見える。VR一人称表示にはprojection layerが必要と判断した。
 - Quest runtimeで`XR_KHR_android_surface_swapchain` SpecVersion 4と`XR_KHR_composition_layer_color_scale_bias` SpecVersion 5が列挙されることを実機logcatで確認した。
 - MediaCodecのAndroid SurfaceをOpenXR swapchainとして生成し、wireの左右眼pose/FOVとside-by-side rectを`XrCompositionLayerProjection`へ提出するnative hookを追加した。
-- native pluginのELF LOAD alignmentはlinker option適用後すべて`0x4000`。APK内`lib/arm64-v8a/libmaquestlink_projection.so`への同梱も確認した。
+- native pluginのELF LOAD alignmentはlinker option適用後すべて`0x4000`。APK内`lib/arm64-v8a/libmetalquestlink_projection.so`への同梱も確認した。
 - Quest EditModeはprojection mapping追加後に成功した。修正版APKをQuest 3へ導入し、ユーザーが有限Quadではない一人称projection表示を装着目視で確認した。
 
 ## 2026-07-15 — project差吸収と負荷制御
@@ -242,4 +282,19 @@
 - loader順序のpure testはOpenXRを先頭へ移し、重複を除きながらvendor loaderとMock HMD loaderの順を保持した。
 - Editor integrationはproject path解決、Unity version parse、ADB extras / serial、status追加項目を含むEditMode 9/9、Simulator PlayMode 1/1が成功した。
 - nativeの通常2D-array testは3360x1760 H.264を120/120 decode。左右別2D swapchain testも同じ解像度を120/120 decodeし、layer logの`swapchainMode=per-eye`を確認した。
-- auto bitrateは3360x1760で20 Mbpsとなる。`MAQUESTLINK_MAX_PENDING_FRAMES`の既定2を超えるVideoToolbox待ちは送信遅延へ積まずdropし、statusの`droppedFrames`で観測する。
+- auto bitrateは3360x1760で20 Mbpsとなる。`METALQUESTLINK_MAX_PENDING_FRAMES`の既定2を超えるVideoToolbox待ちは送信遅延へ積まずdropし、statusの`droppedFrames`で観測する。
+
+## 2026-07-21 — MetalQuestLink改名時の判断
+
+- 公開識別子も含む全面改名のため、UPM packageとAndroid applicationは旧版と別物になる。旧新の混在を黙認させないようwire magicも`MTLK`へ変更し、`0.2.0`のbreaking releaseとした。
+- local checkout directoryは実行中workspaceのrootであるため改名しない。GitHubは`KouyamaCreate/MetalQuestLink`をPublic作成し、`origin`へ設定した。
+- Devpostは表示名を`MetalQuestLink`へ変更したが、connectorにslug更新機能がない。実際のURLに旧slugが残ることを提出worksheetに明記し、手動更新のみ保留した。
+- 旧名を含むgenerated build cache、sample `Library/`、ユーザ領域の旧OpenXR manifestは再生成可能なため削除した。source assetと既存のscene内容は保持した。
+
+## 2026-07-22 — Public OSS公開時の判断
+
+- GitHub accountはlocal `gh`設定に残るaccount名から`KouyamaCreate`と判断し、公開URL、Security form、UPM git URLへ使用した。remote自体は未設定で、GitHub上のrepository作成・Public化はまだ行っていない。
+- `README.en.md`は過去リンクを壊さない短いredirectとして残し、英語本文の二重管理はしない。今後の正本は英語`README.md`と日本語`README.ja.md`。
+- `demo-video/`は14GBで、生成中間物、vendor/CC素材、端末capture、個人絶対pathを含む。OSS本体の再現に不要で権利境界も異なるため全体をignoreし、ローカルデータは削除しない。
+- rootの`session.md`はエージェント作業状態であり製品文書ではないため、内容を保持したままignore対象の`.agents/session.md`へ移した。
+- 配布APK / UPM tarballはjudgeと利用者がrebuild不要で試すため`dist/`へ残す。projectのApache-2.0が第三者SDKや生成objectへ一律適用されると誤解させないため、`THIRD_PARTY_NOTICES.md`で境界を明示した。

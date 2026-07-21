@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using UnityEngine;
 
-namespace MaQuestLink.Editor
+namespace MetalQuestLink.Editor
 {
     [Serializable]
     public sealed class LayerStatus

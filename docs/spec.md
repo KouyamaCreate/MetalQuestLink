@@ -1,10 +1,11 @@
-# MaQuestLink 仕様
+# MetalQuestLink 仕様
 
 ## 実装済み
 
 ### 共有プロトコル v1
 
 - TCPストリーム上で使う、長さプレフィックス付きのlittle-endianバイナリ形式。
+- wire magicはlittle-endian `MTLK`（`0x4b4c544d`）。旧releaseとは接続互換性を持たない。
 - 20 byteの共通ヘッダーは、magic、protocol version、message type、payload length、sequence numberを持つ。
 - payloadの最大長は64 MiB。magic、version、message type、宣言長、メッセージ固有の可変長データをデシリアライズ時に検証する。
 - message type:
@@ -19,10 +20,10 @@
 ### OpenXR基盤
 
 - Khronos OpenXR-SDK 1.1.61をcommit `5267613edf3d937e3d77556a106a65c2f82b25c6` に固定してCMake FetchContentで取得する。
-- `maquestlink_openxr_layer` はloader interface v1をnegotiateし、未知の関数を下位runtimeへそのまま転送するpass-through API layer。
-- build時に `build/openxr/1/api_layers/implicit.d/XrApiLayer_maquestlink.json` を生成する。
-- implicit layerは `MAQUESTLINK_ENABLE_API_LAYER` が存在するときだけ有効、`MAQUESTLINK_DISABLE_API_LAYER` が存在すると無効。
-- `maquestlink_native_test` は `XR_KHR_metal_enable` を使い、runtime提供Metal deviceでstereo array swapchainを作り、指定フレーム数を描画する。
+- `metalquestlink_openxr_layer` はloader interface v1をnegotiateし、未知の関数を下位runtimeへそのまま転送するpass-through API layer。
+- build時に `build/openxr/1/api_layers/implicit.d/XrApiLayer_metalquestlink.json` を生成する。
+- implicit layerは `METALQUESTLINK_ENABLE_API_LAYER` が存在するときだけ有効、`METALQUESTLINK_DISABLE_API_LAYER` が存在すると無効。
+- `metalquestlink_native_test` は `XR_KHR_metal_enable` を使い、runtime提供Metal deviceでstereo array swapchainを作り、指定フレーム数を描画する。
 - `scripts/test_phase1.sh` は `XR_RUNTIME_JSON` でStandalone Meta XR Simulatorを選び、`XDG_DATA_HOME=build` でリポジトリ内のimplicit manifestを検出させる。
 
 ### 映像ストリーミング
@@ -31,8 +32,8 @@
 - client接続中だけ、左右眼のprojection image rectをIOSurface-backed BGRA pixel bufferへside-by-sideでコピーする。同一2D-array swapchainと左右別2D / 2D-array swapchainを扱う。BGRA8はMetal blit、それ以外のRGBA8、RGB10A2、BGR10A2、BGR10_XR、RGBA16Float対応formatはMetal computeで8-bit BGRAへ変換する。
 - `xrEndFrame` 進入時のhost monotonic timestampと、左右 `XrCompositionLayerProjectionView` のpose/FOVを各 `VideoFrame` に格納する。
 - VideoToolbox H.264 encoderはreal-time、frame reorder無効、Main profile、60-frame key interval。bitrate既定値は左右眼合計pixel数に比例する8〜40 Mbps（3360x1760で20 Mbps）で、1〜80 Mbpsの固定値へ上書きできる。非同期encode待ちは既定2 frame（1〜8へ変更可能）に制限し、超過時は遅延を積まずframeをdropする。出力はSPS/PPS付きAnnex B。TCP再接続後の最初の映像は強制keyframeとし、decoderがGOP途中から開始しないようにする。
-- TCP serverはUSBのadb reverseとWi-Fi直結の両方に対応するため、既定で `0.0.0.0:42424` をlistenする。`MAQUESTLINK_PORT` で変更できる。mock clientはloopbackで接続する。切断後は即座にコピー・エンコードを止めてpass-throughへ戻る。
-- `maquestlink_mock_viewer` はprotocol受信、Annex B解析、VideoToolbox decode、metadata検証、decode fps集計を行う。
+- TCP serverはUSBのadb reverseとWi-Fi直結の両方に対応するため、既定で `0.0.0.0:42424` をlistenする。`METALQUESTLINK_PORT` で変更できる。mock clientはloopbackで接続する。切断後は即座にコピー・エンコードを止めてpass-throughへ戻る。
+- `metalquestlink_mock_viewer` はprotocol受信、Annex B解析、VideoToolbox decode、metadata検証、decode fps集計を行う。
 - `scripts/test_phase2.sh` は未接続60-frame pass-throughと、接続240-frame producer / 120-frame decoderの両方を検証する。
 
 ### pose・入力注入
@@ -43,7 +44,7 @@
 - `xrCreateActionSet` / `xrCreateAction` / `xrSuggestInteractionProfileBindings` を追跡し、actionと左右subaction path、binding componentを対応づける。
 - `xrSyncActions` はruntimeへ転送し、`xrGetActionStateBoolean` / `Float` / `Vector2f` / `Pose` の成功結果を受信入力で差し替える。click/touch、trigger、squeeze、thumbstick、grip/aim poseを扱う。
 - `changedSinceLastSync` はsession/action/subactionごとに前回返却値と比較する。入力中断時はruntime stateへ戻る。
-- `maquestlink_mock_viewer --send-input` は既知の合成HMD/controller pose、button、thumbstick、trigger、gripを約90 Hzで送る。
+- `metalquestlink_mock_viewer --send-input` は既知の合成HMD/controller pose、button、thumbstick、trigger、gripを約90 Hzで送る。
 - `scripts/test_phase3.sh` は映像decodeと同時に、合成値がview、action space、boolean/float/vector action stateへ反映されることを検証する。native testの出力はpipeを介さずlog fileへ直接書き、子孫processがpipe writerを継承して終了を妨げる経路を作らない。
 - `xrApplyHapticFeedback` / `xrStopHapticFeedback`の成功結果を左右のHapticCommandへ変換する。振幅は0〜1へclampし、周波数と持続時間を保持する。
 - implicit layer manifestで`XR_EXT_hand_tracking`を列挙し、`xrGetSystemProperties`のsupport、hand tracker作成／破棄、左右26関節のlocateを提供する。受信手がinactiveまたはstaleならinactiveを返す。
@@ -60,20 +61,21 @@
 - HapticCommandは`OVRInput.SetControllerVibration`へ写し、duration満了またはstopで左右個別に停止する。Quest APIのfrequency値は0〜320 Hzを0〜1へ正規化する。
 - VideoFrameのPassthrough flag受信時はMeta Passthrough underlayを有効にし、External Surface overlay全体へ固定alpha 0.82を適用する。
 - 接続候補は`127.0.0.1`（`adb reverse tcp:42424 tcp:42424`）を先に試し、指定されたWi-Fi hostへfallbackする。切断後は500 ms間隔で自動再接続する。
-- `adb shell am start` extrasでdiagnostic、host、Wi-Fi fallback、port、Passthrough、hand visualizationを上書きできる。diagnostic modeは毎秒 `MAQUESTLINK_DIAGNOSTIC` JSONをlogcatへ出す。
+- `adb shell am start` extrasでdiagnostic、host、Wi-Fi fallback、port、Passthrough、hand visualizationを上書きできる。diagnostic modeは毎秒 `METALQUESTLINK_DIAGNOSTIC` JSONをlogcatへ出す。
 - `scripts/test_quest_client.sh` はXR非依存のprotocol/transportをEditModeで検証し、`scripts/build_quest_client.sh` はIL2CPP/ARM64 APKを生成する。
 - `scripts/e2e_device.sh` はinstall、adb reverse、無装着power automation、起動、Mac producer、logcat判定を自動化し、receive/decode 30 fps以上とPose送信60 Hz以上を要求する。実機入力modeは合成固定値を要求せず、Quest診断のpose / hand送信と接続後に再送するhapticで全二重経路を判定する。producer失敗時はMac側末尾と関連するQuest例外を表示する。
 
 ### Unityエディタ統合
 
-- `editor-package/` はUnity 6000.2以降向けlocal UPM package `com.maquestlink.editor`。Unity起動時とPlay開始直前にlayer manifestを `$HOME/.local/share/openxr/1/api_layers/implicit.d` へ登録する。
-- Play開始直前にUnity version、Standalone OpenXR、Simulator runtime、native layer、port、bitrate、pending上限をpreflightする。エラー時はPlayを止め、設定windowに理由を表示する。
+- `editor-package/` はUnity 2022.3 LTS以降向けlocal UPM package `com.metalquestlink.editor`。XR Plug-in Management 4.4.0 / OpenXR 1.8.2をresolver baselineとし、既存projectの新しい互換versionを維持する。Unity起動時とPlay開始直前にlayer manifestを `$HOME/.local/share/openxr/1/api_layers/implicit.d` へ登録する。
+- Play開始直前にUnity version、Standalone OpenXR、Simulator runtime、native layer、port、bitrate、pending上限をpreflightする。6000.2 / 6000.3はverified、2022.3以上のmatrix外versionはwarningと能力check、2022.3未満はerrorとする。能力checkのerror時はPlayを止め、設定windowに理由を表示する。
 - Standaloneの自動設定はOpenXRを先頭loaderにし、既存loaderをfallbackとして保持する。Android側のloader / featureは変更しない。利用者指定pathは絶対pathまたはUnity project root基準の相対pathとして解決する。
-- Play開始直前に `MAQUESTLINK_ENABLE_API_LAYER`、port、bitrate、pending frame上限、layer log、status JSONの環境変数を設定する。ADB deviceがあればserial指定付きで `adb reverse` を設定し、既定ではインストール済みQuest clientをPassthrough / hand visualization / Wi-Fi fallback指定付きの分離processで起動する。Play時にAPK buildは行わない。
-- `Window > MaQuestLink` はQuest接続状態、fps、平均Metal copy / VideoToolbox encode合計時間、encoded / dropped frame数、stream解像度を表示する。layer登録、project check、APK install、adb reverse、client起動を手動でも実行できる。
-- native layerは `MAQUESTLINK_STATUS_FILE` 指定時、connection、encoded / dropped frames、stream寸法、fps、平均copy / encode / pipeline msを1秒周期でatomic JSON更新する。
+- Play開始直前に `METALQUESTLINK_ENABLE_API_LAYER`、port、bitrate、pending frame上限、layer log、status JSONの環境変数を設定する。ADB deviceがあればserial指定付きで `adb reverse` を設定し、既定ではインストール済みQuest clientをPassthrough / hand visualization / Wi-Fi fallback指定付きの分離processで起動する。Play時にAPK buildは行わない。
+- `Window > MetalQuestLink` はQuest接続状態、fps、平均Metal copy / VideoToolbox encode合計時間、encoded / dropped frame数、stream解像度、Unity互換性levelを表示する。`Quick Setup (Project + Quest)`はStandalone OpenXR設定、layer登録、Quest APK installを一括実行し、Quest未接続時はproject setupを完了してAPK installをpendingとして報告する。個別操作も残す。
+- native layerは `METALQUESTLINK_STATUS_FILE` 指定時、connection、encoded / dropped frames、stream寸法、fps、平均copy / encode / pipeline msを1秒周期でatomic JSON更新する。
 - `samples/MetaXRMinimal/` はUnity 6000.3 project。Meta XR Core SDK 203.0.0の`OVRCameraRig`、左右Touch controllerの`OVRGrabber`、`OVRGrabbable` cubeを生成する。
 - `scripts/test_phase5.sh` はsample生成、package manifest EditMode test、Meta XR Simulator上のPlayMode testを実行し、Unity applicationへのlayer loadと未接続待ち状態を検証する。PlayMode runはMetal graphics deviceが必要なため`-nographics`を使わない。
+- `scripts/test_unity_matrix.sh`はrepository外の一時projectで同一packageをUnity 2022.3.44f1 / 6000.2.5f1 / 6000.3.6f1へ解決し、compatibility unit testとC# compile error不在を検証する。
 
 ### 再投影とレイテンシ計測
 
@@ -81,13 +83,14 @@
 - Passthrough時は他のcomposition layerを保持したままprojectionへsource-alphaと固定alpha 0.82を適用する。Android Surface拡張が無効な場合だけ、左右render poseの平均から2 m先のworld-fixed Quadを配置するfallbackを使う。
 - Quest clientは1秒周期でclient monotonic timestampを持つControl Pingを送る。Mac layerは受信host monotonic timestampと元client timestampを持つPongを即時返信する。
 - QuestはPing送信/受信の中央時刻とhost受信時刻から`host - client` offsetを推定する。このoffsetでMac capture timestampをQuest clockへ写し、capture→TCP受信とcapture→MediaCodec output Surface releaseを計測する。
-- `MAQUESTLINK_DIAGNOSTIC` は`reprojection`、`clock_synced`、`clock_rtt_ms`、`capture_to_receive_ms`、`capture_to_decode_ms`を含む。未同期値は`-1`。
-- Mac layer statusはschema `version: 1`とconnection、encoded / dropped frame、stream寸法、copy、encode、合計pipeline msを安定した`Library/MaQuestLink/status.json`へ出す。Quest側decode値はSurface releaseまでであり、光学的motion-to-photonではない。
+- `METALQUESTLINK_DIAGNOSTIC` は`reprojection`、`clock_synced`、`clock_rtt_ms`、`capture_to_receive_ms`、`capture_to_decode_ms`を含む。未同期値は`-1`。
+- Mac layer statusはschema `version: 1`とconnection、encoded / dropped frame、stream寸法、copy、encode、合計pipeline msを安定した`Library/MetalQuestLink/status.json`へ出す。Quest側decode値はSurface releaseまでであり、光学的motion-to-photonではない。
 - `scripts/e2e_device.sh` はQuestのOpenXR初期化完了後に有限producerを開始し、既存fps / pose Hzに加え、immersive projection Surface生成、clock sync、capture-to-decode値を判定する。
 
 ### 配布package
 
-- `editor-package/`はgit URLまたはlocal tarballで導入できる自己完結UPM package。`Native~/macOS/`にarm64 OpenXR layerとmanifest、`QuestClient~/`にIL2CPP / ARM64 APKを含む。installerはrepositoryの`build/`や`quest-client/Builds/`へfallbackしない。
+- `editor-package/`はgit URLまたはlocal tarballで導入できる自己完結UPM package `com.metalquestlink.editor`。`Native~/macOS/`にarm64 OpenXR layerとmanifest、`QuestClient~/`にIL2CPP / ARM64 APKを含む。installerはrepositoryの`build/`や`quest-client/Builds/`へfallbackしない。
+- release 0.2.0でproduct identifierを全面変更した。旧package / APKとのin-place upgradeではなく、新package / applicationとして導入する。
 - package versionの正本は`package.json`。`VERSION`とQuest APK `bundleVersion`を同じsemverに保つ。HEADにtagがあるrelease buildでは`v<semver>`との一致を必須とする。
 - `scripts/build_release.sh`はnative Release build / ctest、Quest APK build、dylib ad-hoc署名を行い、`dist/`へUPM tarball、APK、`SHA256SUMS`、`VERSION`を生成する。
 - `scripts/doctor.sh`はApple Silicon / macOS、package binaryと署名、package/APK version、implicit manifest、Meta XR Simulator、adb、接続deviceとinstall済みAPK versionを検査する。Quest未接続とSimulator停止は警告として通常診断を継続する。

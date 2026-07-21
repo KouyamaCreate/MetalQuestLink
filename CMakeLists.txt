@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(MaQuestLink VERSION 0.1.0 LANGUAGES CXX OBJCXX)
+project(MetalQuestLink VERSION 0.2.0 LANGUAGES CXX OBJCXX)
 
 if(APPLE)
   set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "Build architectures" FORCE)
@@ -8,9 +8,9 @@ endif()
 
 include(CTest)
 
-option(MAQUESTLINK_BUILD_OPENXR "Build the OpenXR layer and native test client" ON)
+option(METALQUESTLINK_BUILD_OPENXR "Build the OpenXR layer and native test client" ON)
 
-if(MAQUESTLINK_BUILD_OPENXR)
+if(METALQUESTLINK_BUILD_OPENXR)
   include(FetchContent)
   set(BUILD_API_LAYERS OFF CACHE BOOL "" FORCE)
   set(BUILD_TESTS OFF CACHE BOOL "" FORCE)

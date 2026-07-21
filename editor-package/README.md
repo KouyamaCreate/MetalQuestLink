@@ -1,11 +1,14 @@
-# MaQuestLink Editor
+# MetalQuestLink Editor
 
-Unity Editor Play ModeをQuest 3 / 3SへstreamするMaQuestLinkの自己完結UPM packageです。
-ビルド済みApple Silicon OpenXR API layerとQuest APKを含みます。
+A self-contained Unity package for streaming Editor Play Mode to Meta Quest 3 / 3S. It includes a
+prebuilt Apple Silicon OpenXR API layer and Quest APK; end users do not need CMake or Xcode.
 
-導入後は `Window > MaQuestLink` を開き、`Install Quest APK` を押してからPlayします。
-package load時にimplicit OpenXR layer manifestを自動登録します。利用者側でCMakeやXcodeを
-実行する必要はありません。
+Unity 2022.3 LTS is the resolver baseline. Package compatibility is verified on Unity 6000.2 and
+6000.3; the 2022.3 local matrix still requires a licensed Editor in the verification environment.
+Projects using newer XR Plug-in Management or OpenXR packages keep their compatible versions.
 
-対応環境、Meta XR Simulatorの導入、Gatekeeper、診断方法はrepository直下の
-`README.md`を参照してください。
+After installation, open **Window > MetalQuestLink**, click **Quick Setup (Project + Quest)**, and
+press Play. The package registers its implicit OpenXR layer manifest when loaded.
+
+See the repository [README](../README.md) for prerequisites, Meta XR Simulator setup, Gatekeeper
+guidance, diagnostics, limitations, and the Japanese documentation link.

@@ -3,19 +3,31 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 UNITY="${UNITY:-/Applications/Unity/Hub/Editor/6000.3.6f1/Unity.app/Contents/MacOS/Unity}"
-SIM_APP="${MAQUESTLINK_SIM_APP:-/Applications/MetaXRSimulator.app}"
+SIM_APP="${METALQUESTLINK_SIM_APP:-/Applications/MetaXRSimulator.app}"
 RUNTIME_JSON="$SIM_APP/Contents/Resources/MetaXRSimulator/meta_openxr_simulator.json"
-META_CORE_LOCAL="${MAQUESTLINK_META_CORE_LOCAL:-/private/tmp/meta-xr-core-203-full/package}"
+META_CORE_LOCAL="${METALQUESTLINK_META_CORE_LOCAL:-/private/tmp/meta-xr-core-203-full/package}"
 version="$(tr -d '[:space:]' < "$ROOT_DIR/editor-package/VERSION")"
-tarball="${MAQUESTLINK_TARBALL:-$ROOT_DIR/dist/com.maquestlink.editor-${version}.tgz}"
+tarball="${METALQUESTLINK_TARBALL:-$ROOT_DIR/dist/com.metalquestlink.editor-${version}.tgz}"
 
 [[ -x "$UNITY" ]] || { echo "Unityが見つかりません: $UNITY" >&2; exit 2; }
 [[ -f "$RUNTIME_JSON" ]] || { echo "Meta XR Simulatorが見つかりません: $RUNTIME_JSON" >&2; exit 2; }
 [[ -s "$tarball" ]] || { echo "UPM tarballがありません: $tarball" >&2; exit 2; }
 
-outside="$(mktemp -d "${TMPDIR:-/tmp}/maquestlink-clean-unity.XXXXXX")"
+outside="$(mktemp -d "${TMPDIR:-/tmp}/metalquestlink-clean-unity.XXXXXX")"
 project="$outside/MetaXRMinimal"
-trap 'rm -rf "$outside"' EXIT
+cleanup() {
+  status=$?
+  if [[ $status -ne 0 ]]; then
+    for log in "$outside"/*.log; do
+      [[ -f "$log" ]] || continue
+      echo "---- $(basename "$log") ----" >&2
+      tail -80 "$log" >&2
+    done
+  fi
+  rm -rf "$outside"
+  return $status
+}
+trap cleanup EXIT
 
 mkdir -p "$project"
 rsync -a \
@@ -23,7 +35,7 @@ rsync -a \
   "$ROOT_DIR/samples/MetaXRMinimal/" "$project/"
 rm -f "$project/Packages/packages-lock.json"
 sed -i '' \
-  "s|\"com.maquestlink.editor\": \"file:[^\"]*\"|\"com.maquestlink.editor\": \"file:$tarball\"|" \
+  "s|\"com.metalquestlink.editor\": \"file:[^\"]*\"|\"com.metalquestlink.editor\": \"file:$tarball\"|" \
   "$project/Packages/manifest.json"
 if [[ -d "$META_CORE_LOCAL" ]]; then
   sed -i '' \
@@ -31,38 +43,47 @@ if [[ -d "$META_CORE_LOCAL" ]]; then
     "$project/Packages/manifest.json"
 fi
 
-"$UNITY" \
-  -batchmode -nographics -quit \
-  -projectPath "$project" \
-  -executeMethod MaQuestLink.Sample.Editor.SampleBuilder.ConfigureAndBuild \
-  -logFile "$outside/build.log"
+if ! "$UNITY" \
+    -batchmode -nographics -quit \
+    -projectPath "$project" \
+    -executeMethod MetalQuestLink.Sample.Editor.SampleBuilder.ConfigureAndBuild \
+    -logFile "$outside/build.log"; then
+  echo "Unity sample setup failed" >&2
+  exit 1
+fi
 
-"$UNITY" \
-  -batchmode -nographics \
-  -projectPath "$project" \
-  -runTests -testPlatform EditMode \
-  -testFilter MaQuestLink.Editor.Tests \
-  -testResults "$outside/editmode-results.xml" \
-  -logFile "$outside/editmode.log"
+if ! "$UNITY" \
+    -batchmode -nographics \
+    -projectPath "$project" \
+    -runTests -testPlatform EditMode \
+    -testFilter MetalQuestLink.Editor.Tests \
+    -testResults "$outside/editmode-results.xml" \
+    -logFile "$outside/editmode.log"; then
+  echo "Unity EditMode tests failed" >&2
+  exit 1
+fi
 
 open -a "$SIM_APP" >/dev/null 2>&1
-XR_RUNTIME_JSON="$RUNTIME_JSON" \
-MAQUESTLINK_ENABLE_API_LAYER=1 \
-  "$UNITY" \
-  -batchmode \
-  -projectPath "$project" \
-  -runTests -testPlatform PlayMode \
-  -testFilter MaQuestLink.Sample.Tests.SamplePlayModeTests \
-  -testResults "$outside/playmode-results.xml" \
-  -logFile "$outside/playmode.log"
+if ! XR_RUNTIME_JSON="$RUNTIME_JSON" \
+    METALQUESTLINK_ENABLE_API_LAYER=1 \
+    "$UNITY" \
+    -batchmode \
+    -projectPath "$project" \
+    -runTests -testPlatform PlayMode \
+    -testFilter MetalQuestLink.Sample.Tests.SamplePlayModeTests \
+    -testResults "$outside/playmode-results.xml" \
+    -logFile "$outside/playmode.log"; then
+  echo "Unity PlayMode tests failed" >&2
+  exit 1
+fi
 
 grep -q 'result="Passed"' "$outside/editmode-results.xml"
 grep -q 'result="Passed"' "$outside/playmode-results.xml"
-grep -q 'MAQUESTLINK_SAMPLE_PLAY_VERIFIED layer=loaded status=waiting_for_connection' "$outside/playmode.log"
-grep -q 'loaded instance for' "$project/Library/MaQuestLink/layer.log"
+grep -q 'METALQUESTLINK_SAMPLE_PLAY_VERIFIED layer=loaded status=waiting_for_connection' "$outside/playmode.log"
+grep -q 'loaded instance for' "$project/Library/MetalQuestLink/layer.log"
 
-package_json="$(find "$project/Library/PackageCache" -path '*com.maquestlink.editor*/package.json' -print -quit)"
-[[ -n "$package_json" ]] || { echo "PackageCacheにMaQuestLink packageがありません" >&2; exit 1; }
+package_json="$(find "$project/Library/PackageCache" -path '*com.metalquestlink.editor*/package.json' -print -quit)"
+[[ -n "$package_json" ]] || { echo "PackageCacheにMetalQuestLink packageがありません" >&2; exit 1; }
 package_root="$(dirname "$package_json")"
 "$ROOT_DIR/scripts/doctor.sh" --package-root "$package_root" --register
 

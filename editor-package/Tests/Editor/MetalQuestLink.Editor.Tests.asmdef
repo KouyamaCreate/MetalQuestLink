@@ -1,0 +1,7 @@
+{
+  "name": "MetalQuestLink.Editor.Tests",
+  "rootNamespace": "MetalQuestLink.Editor.Tests",
+  "references": ["MetalQuestLink.Editor"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

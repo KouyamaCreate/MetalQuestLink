@@ -1,5 +1,74 @@
 # 変更履歴
 
+## 2026-07-22 — Build Weekデモ映像 v4最終版
+
+- 39秒のBlender CGを7固有ショットへ再構成し、84秒の最終タイムラインでCGとRemotionを交互に配置した。各境界は直前の画面内移動ベクトルを引き継ぐ12フレームのdirectional handoffとcustom cubic Bézierで接続した。
+- Unity Editor生成画像はそのまま保持し、Game viewportだけへ共有XR動画を合成した。MacとQuestは同じframe-driven sceneを使い、Questだけ左右眼へ小さい視差を与えた。左右レンズUVの鏡像を補正し、Mac・左眼・右眼すべてでシアンcubeが左、紫sphereが右になることをVision確認した。
+- Quest USB-Cを前面から見て右側の楕円リセスへ移し、金属舌を内部へ埋め、黒いplug bodyを開口へ密着させた。ケーブルはvisorを横切らず右下へ逃がし、端子アップを本編へ残した。
+- レンズアップは1つの連続ショットだけに限定し、続くCGをMac→Quest rack focusとcounter-orbit resolveへ変更した。Macはevaluated boundsで接地した。
+- EEVEE Next 64 samples / 2560x1440 / 16-bit PNGを1170枚生成し、Lanczosで1080pへ縮小した。停止境界に残った旧時刻frame 638を検出して単独再レンダーし、欠番・0-byte・旧frame混入を0にした。
+- `FullDemoV4`へシンプル字幕、ACE-Step 1.5 XL BGM、MOSS-SoundEffect-V2.0の4 cue、英語ナレーションを統合した。最終masterは84.000秒 / 2520フレーム / 1920x1080 / 30 fps、-16.01 LUFS-I / -3.25 dBTP。全decode、black/freeze、4秒間隔Vision、全14境界、端子原寸、1秒間隔duplicate scanに合格した。
+
+理由: Unity Play ModeからQuest 3へbuildなしで同じ動くsceneが届く因果関係を、製品CGと技術情報の密度を交互に保ちながら、端子・レンズ・カメラ接続の不自然さなしで示すため。
+
+## 2026-07-22 — Build Weekデモ映像 v3再構成
+
+- 108秒版の反復的なCG尺を廃止し、8つの固有CGショット31.5秒、6章のRemotion 50秒、spoken resolve 2.5秒からなる84秒構成へ変更した。
+- imagegenでUnity 6編集画面のEdit / Play hover / active Playの3状態を制作し、MacBookの実パネルメッシュへ直接UV割り当てした。旧`UNITY_PLAY_TRIANGLE`と`DATA_ARC`は名前優先で削除し、親子階層に残らないようにした。
+- MacBookをworld-space boundsで接地し、トラックパッドをアルミ材へ変更した。Questは左右各448面の物理レンズへ別々の正方形寄り映像を割り当て、USB-C端子をストラップ下の側面へ移した。
+- CGは2560x1440 / 64 samples / 16-bit PNGで生成後、Lanczosで1080pへ縮小する。DOFはf/8〜32へ抑え、エッジと被写界深度のジャギーを減らす。
+- 後半をfull duplex、backpressure、package、compatibility、native stack、OSSの固有6章へ再設計し、カスタムBézier easingと全フレーム継続する背景運動を実装した。
+- 効果音を全削除した。83.52秒の英語ナレーションを映像内容へ同期し、ACE-Step BGMは終盤のpeak / resolveを84秒の結末へ再配置した。
+- 最終masterは84.000秒 / 2520フレーム / 1920x1080 / 30 fps。全decode、黒画面、-55 dB・1秒のfreeze、1秒間隔の非連続重複frame、境界Vision検査に合格し、音声を-16.00 LUFS-Iへ正規化した。
+
+理由: 同じ素材の繰り返しによる尺稼ぎをなくし、Mac / Questを必要とする説明だけをCG、技術説明をRemotionへ分離し、提出映像の密度と可読性を上げるため。
+
+## 2026-07-21 — Build Weekデモ映像 v2全面再制作
+
+- CG主体の108秒構成へ刷新し、Blender 72秒、英語Remotion 30秒、end card 6秒へ短縮した。
+- MacBookの実メッシュboundsを使う接地補正を追加し、画面へクリーンなUnity Play映像を直接埋め込んだ。
+- Questの外付け表示カードを廃止し、元モデルの左右レンズ各448面へ同一VR環境の左右動画材を直接割り当てた。
+- Quest眼素材の誤った上下配置を修正し、正方形寄りの左右眼を横並びにして別々の物理レンズへ投影した。
+- Quest内部カメラを24〜26mmの超近接・正対構図へ変更し、上向きに広がるストラップを画角外へ送りつつ両眼を水平に見せた。
+- Unity編集画面を13秒へ延長し、冒頭3ショットの連続push-inとframe 300のPlayクリックを同期した。
+- ケーブルを共通曲線上の芯線と10本編組へ作り直し、両端をMacBookとQuestの実ポート位置へ接続した。
+- Blender本番中間素材を8-bitから16-bit PNGへ変更し、最終end cardへCC BY 4.0作者クレジットを追加した。
+- Qwen3-TTS Baseの英語男性ナレーションを完全ローカル生成し、Whisper逆文字起こしとラウドネス検証を行った。
+- 2160/2160枚の1080p 16-bit PNGを欠損・0-byteなしで書き出し、Remotionと結合した108秒・3240フレームの最終masterを生成した。
+- 最終音声を-16.1 LUFS-I / -2.1 dBTPへ正規化し、全編decode、black/freeze scan、3秒間隔と切替境界のVision QAを完了した。
+
+理由: 製品モデル、画面埋め込み、VR両眼表示、カメラワークの見た目を提出品質へ引き上げ、3分制限内でCGを主役にするため。
+
+## 2026-07-21 — Build Weekデモ映像
+
+- Blender MCPでUnity PlayからQuestへの接続フローを示す12秒の3D可視化を制作した。
+- Remotionで技術構成、双方向入力、Quest 3実測値、配布互換性、Codex / GPT-5.6の役割を説明する98秒のモーショングラフィクスを追加した。
+- ACE-Step 1.5 XL TurboのBGM、MOSS-SoundEffect-v2.0の7種SFX、英語ナレーションを統合し、1:58の1080p動画へ書き出した。
+- 冒頭は実機収録と誤認されないよう`3D FLOW VISUALIZATION`と表示する。実機未接続のため、提出要件に応じて先頭12秒をUnity / Quest実写へ差し替える。
+
+理由: 3分以内で製品価値、技術的独自性、実測根拠、OSS配布性を一貫して説明できる提出用成果物を用意するため。
+
+## 2026-07-21 — MetalQuestLink全面改名
+
+- 表示名だけでなく、C# namespace / class / asmdef、UPM ID、Android application ID、OpenXR layer、環境変数、CMake target、native library、APK / tarball、sample path、diagnostic marker、docsを`MetalQuestLink`へ統一した。
+- wire magicを`MQLK`から`MTLK`へ変更し、混在を誤接続として拒否する。release versionをbreaking changeとして`0.2.0`へ上げた。
+- 配布物名を`com.metalquestlink.editor-0.2.0.tgz`と`MetalQuestLink-0.2.0.apk`へ変更した。
+
+理由: 英語圏でもMetalベースのQuest streaming toolだと名称から理解しやすくし、公開surfaceに旧称を残さないため。
+
+## 2026-07-21 — OpenAI Build Week提出・Unity互換性・OSS運用
+
+- Editor packageのUnity baselineを6000.2から2022.3 LTSへ変更し、XR Management / OpenXR依存を4.4.0 / 1.8.2のresolver baselineへ下げた。
+- version番号だけでPlayを拒否せず、verified / compatible-unverified / unsupportedの互換性levelと既存能力checkを組み合わせるpreflightへ変更した。
+- `Quick Setup (Project + Quest)`でStandalone OpenXR設定、layer登録、同梱APK installを一括実行できるようにした。
+- Unity 2022.3 / 6000.2 / 6000.3の一時project matrix testを追加した。
+- 英語judge guide、互換性方針、Devpost worksheet、3分demo構成を追加した。
+- Apache-2.0、CONTRIBUTING、Code of Conduct、Security Policy、CHANGELOG、Issue / PR templateを追加し、外部contributor向けdocs更新契約を定義した。
+- Unity 6000.2 / 6000.3 matrix、新tarballのrelease smoke、repository外Unity/Simulator clean E2Eを成功させた。2022.3はlocal Editor license未有効で実行前にblockedした。
+- Devpostの未提出草稿を`MetalQuestLink`、Developer Tools向けtagline、事実ベースの説明、Built withへ更新した。
+
+理由: 特定Unity patchへの不要な固定を減らし、配布tarballを短時間で評価でき、公開後もIssue / PRと実装docsが同期する運用にするため。
+
 ## 2026-07-15
 
 ### 変更
@@ -62,7 +131,7 @@
 ### Phase 2 影響
 
 - `layer/CMakeLists.txt`
-- `layer/include/maquestlink/protocol.hpp`
+- `layer/include/metalquestlink/protocol.hpp`
 - `layer/src/openxr_layer.cpp`、`layer/src/protocol.cpp`、`layer/src/streaming.*`
 - `layer/tools/mock_viewer.mm`、`layer/tests/protocol_tests.cpp`
 - `scripts/test_phase2.sh`
@@ -87,7 +156,7 @@
 
 ### Phase 3 影響
 
-- `layer/include/maquestlink/protocol.hpp`
+- `layer/include/metalquestlink/protocol.hpp`
 - `layer/src/input_injection.*`、`layer/src/transport.*`
 - `layer/src/openxr_layer.cpp`、`layer/src/streaming.mm`
 - `layer/native-test/hello_xr_metal.mm`、`layer/tools/mock_viewer.mm`
@@ -132,7 +201,7 @@
 
 ### Phase 5 変更
 
-- local UPM package `com.maquestlink.editor` とconnection/性能表示Editor windowを追加した。
+- local UPM package `com.metalquestlink.editor` とconnection/性能表示Editor windowを追加した。
 - layer自動登録、Play開始前の環境設定、adb reverse、APK install/startをEditorへ統合した。
 - native layerへ接続状態、fps、copy/encode時間のJSON status出力を追加した。
 - Meta XR SDKの最小grabbable sceneとUnity EditMode / PlayMode E2Eを追加した。
@@ -172,7 +241,7 @@
 ### Phase 6 影響
 
 - `layer/src/transport.cpp`、`layer/tools/mock_viewer.mm`
-- `quest-client/Assets/MaQuestLink/Runtime/`、`Tests/EditMode/`
+- `quest-client/Assets/MetalQuestLink/Runtime/`、`Tests/EditMode/`
 - `scripts/test_phase1.sh`、`test_phase2.sh`、`test_phase3.sh`、`test_quest_client.sh`、`build_quest_client.sh`、`e2e_device.sh`、`test_phase5.sh`
 - `README.md`、`docs/`、`session.md`
 
@@ -219,8 +288,8 @@
 
 ### Phase 8 影響
 
-- `layer/include/maquestlink/protocol.hpp`、`layer/src/`、`layer/native-test/`、`layer/tools/`、`layer/tests/`
-- `quest-client/Assets/MaQuestLink/Runtime/`、`Editor/`、`Tests/EditMode/`、Quest / OpenXR project settings
+- `layer/include/metalquestlink/protocol.hpp`、`layer/src/`、`layer/native-test/`、`layer/tools/`、`layer/tests/`
+- `quest-client/Assets/MetalQuestLink/Runtime/`、`Editor/`、`Tests/EditMode/`、Quest / OpenXR project settings
 - `editor-package/Native~/`、`editor-package/QuestClient~/`、`dist/`
 - `scripts/test_phase3.sh`、`test_phase8.sh`、`e2e_device.sh`
 - `README.md`、`docs/`、`session.md`
@@ -243,7 +312,7 @@
 - Quest clientへ左右26関節のprocedural skeleton表示を追加した。Android playerでprimitive collider classがstripされる問題を避け、MeshFilter / MeshRendererだけで生成する。
 - device E2Eへhand visualizationとactive joint必須modeを追加し、Quest 3実機で左右52関節、hand message 2,465件、Passthrough有効を同時確認した。
 - Editor packageのPlay hookはAPKをbuildせず、adb reverse後にインストール済みclientをPassthrough / hand visualization extras付きで起動する。
-- `Window > MaQuestLink`へ`Passthrough preview`と`Show tracked hands`を追加した。
+- `Window > MetalQuestLink`へ`Passthrough preview`と`Show tracked hands`を追加した。
 
 理由: コントローラなしでも追跡結果を目視でき、既存Unity projectのPlayからAndroid build待ちなしで実機previewへ入れるようにするため。
 
@@ -277,3 +346,20 @@
 - native testへ左右別swapchain modeを追加し、Phase 2回帰で通常arrayと左右別2Dをどちらも実decodeする。
 
 理由: Unity version、XR loader順、stereo rendering mode、render texture format、接続端末、解像度が異なる既存projectへ、個別改造なしでUPM packageを導入できる範囲を広げるため。
+
+### MetalQuestLink全面改名の完了検証
+
+- product name、C# namespace / assembly、UPM / Android ID、OpenXR layer、environment variable、CMake target、native library、APK / tarball、sample、docsを`MetalQuestLink` / `metalquestlink`へ統一した。
+- wire magicを`MQLK`から`MTLK`へ変更し、新旧binaryの誤接続を防ぐbreaking release `0.2.0`とした。
+- renamed native build / CTest 1/1、Quest EditMode 12/12、Unity 6000.2 / 6000.3 matrix、APK build、release smoke、repository外clean tarball Unity / Simulator E2Eが成功した。
+- Devpostの表示名・tagline・説明は更新済み。connectorがslug変更を提供しないため、URLの`maquestlink`だけは手動更新待ち。
+
+### Public OSS repository documentation
+
+- GitHub root `README.md`を英語のcanonical entry pointへ変更し、完全な日本語ガイドを`README.ja.md`へ移した。
+- rootからinstall、互換性、architecture、feature status、diagnostics、build/test、limitations、contribution、security、licenseへ到達できるよう整理した。
+- `SUPPORT.md`、`THIRD_PARTY_NOTICES.md`、`.gitattributes`、Dependabot設定、Public公開checklistを追加した。
+- UPM package READMEを英語化し、Issueのsecurity linkから`OWNER` placeholderを除去した。
+- 14GBの`demo-video/`は生成render、第三者reference、実機capture、個人絶対pathを含むため、作業データを削除せずrepository全体のignore対象にした。公開仕様から未公開video asset固有の制作仕様を分離した。
+
+理由: 海外利用者がGitHub rootだけで価値・導入・制約・参加方法を判断でき、ローカル制作環境や第三者素材を誤ってPublicへ含めないため。

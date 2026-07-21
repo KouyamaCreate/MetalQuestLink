@@ -4,31 +4,31 @@ using System.Text;
 using UnityEditor.PackageManager;
 using UnityEngine;
 
-namespace MaQuestLink.Editor
+namespace MetalQuestLink.Editor
 {
     public static class OpenXRLayerInstaller
     {
-        public const string LayerName = "XR_APILAYER_MAQUESTLINK_streaming";
+        public const string LayerName = "XR_APILAYER_METALQUESTLINK_streaming";
         public const string DefaultSimulatorRuntimeJson =
             "/Applications/MetaXRSimulator.app/Contents/Resources/MetaXRSimulator/meta_openxr_simulator.json";
 
         public static string StatusPath => Path.Combine(ProjectStateDirectory, "status.json");
         public static string LogPath => Path.Combine(ProjectStateDirectory, "layer.log");
         public static string ProjectStateDirectory => Path.GetFullPath(
-            Path.Combine(Application.dataPath, "..", "Library", "MaQuestLink"));
+            Path.Combine(Application.dataPath, "..", "Library", "MetalQuestLink"));
 
         public static void PrepareEnvironment()
         {
             Directory.CreateDirectory(ProjectStateDirectory);
-            Environment.SetEnvironmentVariable("MAQUESTLINK_ENABLE_API_LAYER", "1");
-            Environment.SetEnvironmentVariable("MAQUESTLINK_DISABLE_API_LAYER", null);
-            Environment.SetEnvironmentVariable("MAQUESTLINK_PORT", MaQuestLinkSettings.instance.port.ToString());
+            Environment.SetEnvironmentVariable("METALQUESTLINK_ENABLE_API_LAYER", "1");
+            Environment.SetEnvironmentVariable("METALQUESTLINK_DISABLE_API_LAYER", null);
+            Environment.SetEnvironmentVariable("METALQUESTLINK_PORT", MetalQuestLinkSettings.instance.port.ToString());
             Environment.SetEnvironmentVariable(
-                "MAQUESTLINK_BITRATE_MBPS", MaQuestLinkSettings.instance.bitrateMbps.ToString());
+                "METALQUESTLINK_BITRATE_MBPS", MetalQuestLinkSettings.instance.bitrateMbps.ToString());
             Environment.SetEnvironmentVariable(
-                "MAQUESTLINK_MAX_PENDING_FRAMES", MaQuestLinkSettings.instance.maxPendingFrames.ToString());
-            Environment.SetEnvironmentVariable("MAQUESTLINK_LAYER_LOG", LogPath);
-            Environment.SetEnvironmentVariable("MAQUESTLINK_STATUS_FILE", StatusPath);
+                "METALQUESTLINK_MAX_PENDING_FRAMES", MetalQuestLinkSettings.instance.maxPendingFrames.ToString());
+            Environment.SetEnvironmentVariable("METALQUESTLINK_LAYER_LOG", LogPath);
+            Environment.SetEnvironmentVariable("METALQUESTLINK_STATUS_FILE", StatusPath);
             var runtimeJson = FindSimulatorRuntimeJson();
             if (!string.IsNullOrEmpty(runtimeJson))
             {
@@ -43,17 +43,17 @@ namespace MaQuestLink.Editor
             if (string.IsNullOrEmpty(libraryPath))
             {
                 throw new FileNotFoundException(
-                    "MaQuestLink native layer is missing from this package. Reinstall the release package.");
+                    "MetalQuestLink native layer is missing from this package. Reinstall the release package.");
             }
 
-            var manifestDirectory = Environment.GetEnvironmentVariable("MAQUESTLINK_MANIFEST_DIR");
+            var manifestDirectory = Environment.GetEnvironmentVariable("METALQUESTLINK_MANIFEST_DIR");
             if (string.IsNullOrEmpty(manifestDirectory))
             {
                 var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
                 manifestDirectory = Path.Combine(home, ".local", "share", "openxr", "1", "api_layers", "implicit.d");
             }
             Directory.CreateDirectory(manifestDirectory);
-            var manifestPath = Path.Combine(manifestDirectory, "XrApiLayer_maquestlink.json");
+            var manifestPath = Path.Combine(manifestDirectory, "XrApiLayer_metalquestlink.json");
             var escapedLibraryPath = EscapeJson(Path.GetFullPath(libraryPath));
             var json = "{\n" +
                        "  \"file_format_version\": \"1.0.0\",\n" +
@@ -62,15 +62,15 @@ namespace MaQuestLink.Editor
                        $"    \"library_path\": \"{escapedLibraryPath}\",\n" +
                        "    \"api_version\": \"1.0\",\n" +
                        "    \"implementation_version\": \"1\",\n" +
-                       "    \"description\": \"MaQuestLink OpenXR streaming layer\",\n" +
+                       "    \"description\": \"MetalQuestLink OpenXR streaming layer\",\n" +
                        "    \"instance_extensions\": [\n" +
                        "      {\n" +
                        "        \"name\": \"XR_EXT_hand_tracking\",\n" +
                        "        \"extension_version\": \"4\"\n" +
                        "      }\n" +
                        "    ],\n" +
-                       "    \"enable_environment\": \"MAQUESTLINK_ENABLE_API_LAYER\",\n" +
-                       "    \"disable_environment\": \"MAQUESTLINK_DISABLE_API_LAYER\"\n" +
+                       "    \"enable_environment\": \"METALQUESTLINK_ENABLE_API_LAYER\",\n" +
+                       "    \"disable_environment\": \"METALQUESTLINK_DISABLE_API_LAYER\"\n" +
                        "  }\n" +
                        "}\n";
             if (!File.Exists(manifestPath) || File.ReadAllText(manifestPath) != json)
@@ -89,7 +89,7 @@ namespace MaQuestLink.Editor
             }
             var candidates = new[]
             {
-                Path.Combine(package.resolvedPath, "Native~", "macOS", "libmaquestlink_openxr_layer.so"),
+                Path.Combine(package.resolvedPath, "Native~", "macOS", "libmetalquestlink_openxr_layer.so"),
             };
             foreach (var candidate in candidates)
             {
@@ -104,7 +104,7 @@ namespace MaQuestLink.Editor
 
         public static string FindDefaultApk()
         {
-            var configured = MaQuestLinkSettings.instance.apkPath;
+            var configured = MetalQuestLinkSettings.instance.apkPath;
             if (!string.IsNullOrEmpty(configured))
             {
                 return ResolveProjectPath(configured);
@@ -116,7 +116,7 @@ namespace MaQuestLink.Editor
             }
             var candidates = new[]
             {
-                Path.Combine(package.resolvedPath, "QuestClient~", "MaQuestLink.apk"),
+                Path.Combine(package.resolvedPath, "QuestClient~", "MetalQuestLink.apk"),
             };
             foreach (var candidate in candidates)
             {
@@ -132,8 +132,8 @@ namespace MaQuestLink.Editor
         {
             var candidates = new[]
             {
-                MaQuestLinkSettings.instance.openXrRuntimeJsonPath,
-                Environment.GetEnvironmentVariable("MAQUESTLINK_XR_RUNTIME_JSON"),
+                MetalQuestLinkSettings.instance.openXrRuntimeJsonPath,
+                Environment.GetEnvironmentVariable("METALQUESTLINK_XR_RUNTIME_JSON"),
                 Environment.GetEnvironmentVariable("XR_RUNTIME_JSON"),
                 DefaultSimulatorRuntimeJson,
             };

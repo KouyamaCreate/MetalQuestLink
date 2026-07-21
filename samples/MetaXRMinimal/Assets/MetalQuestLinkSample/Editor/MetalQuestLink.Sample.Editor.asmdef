@@ -1,0 +1,15 @@
+{
+  "name": "MetalQuestLink.Sample.Editor",
+  "rootNamespace": "MetalQuestLink.Sample.Editor",
+  "references": [
+    "MetalQuestLink.Editor",
+    "MetalQuestLink.Sample.Demo",
+    "Oculus.VR",
+    "Unity.XR.Management",
+    "Unity.XR.Management.Editor",
+    "Unity.XR.OpenXR",
+    "Unity.XR.OpenXR.Editor"
+  ],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

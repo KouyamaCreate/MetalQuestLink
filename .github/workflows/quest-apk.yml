@@ -26,12 +26,12 @@ jobs:
           projectPath: quest-client
           unityVersion: 6000.3.6f1
           targetPlatform: Android
-          buildMethod: MaQuestLink.QuestClient.Editor.BuildQuestClient.Build
+          buildMethod: MetalQuestLink.QuestClient.Editor.BuildQuestClient.Build
           allowDirtyBuild: true
       - name: Verify APK
-        run: test -s quest-client/Builds/MaQuestLink.apk
+        run: test -s quest-client/Builds/MetalQuestLink.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: MaQuestLink-Quest-APK
-          path: quest-client/Builds/MaQuestLink.apk
+          name: MetalQuestLink-Quest-APK
+          path: quest-client/Builds/MetalQuestLink.apk
           if-no-files-found: error

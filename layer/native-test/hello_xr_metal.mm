@@ -132,8 +132,8 @@ struct InputTest {
   const std::array<XrPath, 2> subactions = {test.left_path, test.right_path};
 
   XrActionSetCreateInfo set_info{.type = XR_TYPE_ACTION_SET_CREATE_INFO, .next = nullptr};
-  std::strncpy(set_info.actionSetName, "maquestlink_input", XR_MAX_ACTION_SET_NAME_SIZE - 1);
-  std::strncpy(set_info.localizedActionSetName, "MaQuestLink Input",
+  std::strncpy(set_info.actionSetName, "metalquestlink_input", XR_MAX_ACTION_SET_NAME_SIZE - 1);
+  std::strncpy(set_info.localizedActionSetName, "MetalQuestLink Input",
                XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE - 1);
   set_info.priority = 0;
   check(xrCreateActionSet(instance, &set_info, &test.action_set), "xrCreateActionSet");
@@ -359,12 +359,12 @@ void poll_events(XrInstance instance, XrSession session, SessionState& state) {
 
 int run(int argc, char** argv) {
   const int requested_frames = parse_frame_count(argc, argv);
-  const bool verify_synthetic_input = std::getenv("MAQUESTLINK_VERIFY_INPUT") != nullptr;
-  const bool verify_device_input = std::getenv("MAQUESTLINK_VERIFY_DEVICE_INPUT") != nullptr;
+  const bool verify_synthetic_input = std::getenv("METALQUESTLINK_VERIFY_INPUT") != nullptr;
+  const bool verify_device_input = std::getenv("METALQUESTLINK_VERIFY_DEVICE_INPUT") != nullptr;
   const bool verify_input = verify_synthetic_input || verify_device_input;
-  const bool require_hands = std::getenv("MAQUESTLINK_REQUIRE_HANDS") != nullptr;
+  const bool require_hands = std::getenv("METALQUESTLINK_REQUIRE_HANDS") != nullptr;
   const bool per_eye_swapchains =
-      std::getenv("MAQUESTLINK_TEST_PER_EYE_SWAPCHAINS") != nullptr;
+      std::getenv("METALQUESTLINK_TEST_PER_EYE_SWAPCHAINS") != nullptr;
 
   std::uint32_t extension_count{};
   check(xrEnumerateInstanceExtensionProperties(nullptr, 0, &extension_count, nullptr),
@@ -379,17 +379,17 @@ int run(int argc, char** argv) {
     throw std::runtime_error("runtime does not expose XR_KHR_metal_enable");
   }
   if (verify_input && !has_extension(extensions, XR_EXT_HAND_TRACKING_EXTENSION_NAME)) {
-    throw std::runtime_error("MaQuestLink layer does not expose XR_EXT_hand_tracking");
+    throw std::runtime_error("MetalQuestLink layer does not expose XR_EXT_hand_tracking");
   }
   std::cout << "metal_extension=" << XR_KHR_METAL_ENABLE_EXTENSION_NAME << '\n';
 
   std::vector<const char*> enabled_extensions{XR_KHR_METAL_ENABLE_EXTENSION_NAME};
   if (verify_input) enabled_extensions.push_back(XR_EXT_HAND_TRACKING_EXTENSION_NAME);
   XrInstanceCreateInfo instance_info{.type = XR_TYPE_INSTANCE_CREATE_INFO, .next = nullptr};
-  std::strncpy(instance_info.applicationInfo.applicationName, "MaQuestLinkNativeTest",
+  std::strncpy(instance_info.applicationInfo.applicationName, "MetalQuestLinkNativeTest",
                XR_MAX_APPLICATION_NAME_SIZE - 1);
   instance_info.applicationInfo.applicationVersion = 1;
-  std::strncpy(instance_info.applicationInfo.engineName, "MaQuestLink",
+  std::strncpy(instance_info.applicationInfo.engineName, "MetalQuestLink",
                XR_MAX_ENGINE_NAME_SIZE - 1);
   instance_info.applicationInfo.engineVersion = 1;
   instance_info.applicationInfo.apiVersion = verify_input ? XR_MAKE_VERSION(1, 1, 0)
@@ -428,7 +428,7 @@ int run(int argc, char** argv) {
     check(xrGetSystemProperties(instance, system_id, &properties),
           "xrGetSystemProperties(hand tracking)");
     if (!hand_properties.supportsHandTracking) {
-      throw std::runtime_error("MaQuestLink layer did not report hand tracking support");
+      throw std::runtime_error("MetalQuestLink layer did not report hand tracking support");
     }
   }
 
@@ -686,7 +686,7 @@ int run(int argc, char** argv) {
     throw std::runtime_error("synthetic input was not observed through all OpenXR APIs");
   }
   if (verify_synthetic_input) {
-    std::cout << "MAQUESTLINK_INPUT_E2E_OK views=1 actions=1 space=1 hands="
+    std::cout << "METALQUESTLINK_INPUT_E2E_OK views=1 actions=1 space=1 hands="
               << input_test.hand_verified << " haptics=1\n";
   }
   if (verify_device_input &&
@@ -695,7 +695,7 @@ int run(int argc, char** argv) {
     throw std::runtime_error("device input path did not complete OpenXR action and haptic calls");
   }
   if (verify_device_input) {
-    std::cout << "MAQUESTLINK_DEVICE_INPUT_E2E_OK actions=1 hands="
+    std::cout << "METALQUESTLINK_DEVICE_INPUT_E2E_OK actions=1 hands="
               << input_test.hand_verified << " haptics=1\n";
   }
   if (input_test.left_hand_tracker != XR_NULL_HANDLE) {
@@ -714,7 +714,7 @@ int run(int argc, char** argv) {
     check(xrDestroyActionSet(input_test.action_set), "xrDestroyActionSet");
   }
   check(xrDestroyInstance(instance), "xrDestroyInstance");
-  std::cout << "MAQUESTLINK_FRAME_LOOP_OK frames=" << rendered_frames << '\n';
+  std::cout << "METALQUESTLINK_FRAME_LOOP_OK frames=" << rendered_frames << '\n';
   return rendered_frames == requested_frames ? 0 : 1;
 }
 
@@ -726,7 +726,7 @@ int main(int argc, char** argv) {
     try {
       result = run(argc, argv);
     } catch (const std::exception& error) {
-      std::cerr << "MAQUESTLINK_NATIVE_TEST_FAILED: " << error.what() << '\n';
+      std::cerr << "METALQUESTLINK_NATIVE_TEST_FAILED: " << error.what() << '\n';
     }
   }
   std::cout.flush();

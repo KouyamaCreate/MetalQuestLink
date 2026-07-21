@@ -1,18 +1,18 @@
 # Phase 7 配布パッケージング 最終レポート
 
-最終更新: 2026-07-15
+最終更新: 2026-07-21
 
 ## 結論
 
-MaQuestLinkを、Apple Silicon Mac利用者がCMake / Xcode / Homebrewなしで導入できる自己完結UPM
+MetalQuestLinkを、Apple Silicon Mac利用者がCMake / Xcode / Homebrewなしで導入できる自己完結UPM
 packageへ変更した。package導入後は、同梱APKのinstallとUnity Playだけで利用できる。
 
 ## 配布物
 
 `scripts/build_release.sh`は`editor-package/package.json`のsemverを使い、`dist/`へ次を生成する。
 
-- `com.maquestlink.editor-<version>.tgz`
-- `MaQuestLink-<version>.apk`
+- `com.metalquestlink.editor-<version>.tgz`
+- `MetalQuestLink-<version>.apk`
 - `SHA256SUMS`
 - `VERSION`
 
@@ -22,7 +22,7 @@ installerはpackage外のrepository build成果物へfallbackしない。native 
 ## 導入経路
 
 - Unity Package Managerのlocal tarball
-- `https://github.com/<owner>/MaQuestLink.git?path=editor-package#v<version>`形式のgit URL
+- `https://github.com/KouyamaCreate/MetalQuestLink.git?path=editor-package#v<version>`形式のgit URL
 - source開発時のlocal `editor-package/package.json`
 
 package load時にabsolute native pathを持つimplicit OpenXR layer manifestを自動登録する。
@@ -35,7 +35,7 @@ package load時にabsolute native pathを持つimplicit OpenXR layer manifestを
 - UPM / APK / VERSIONのSHA-256: 全対象成功
 - repository外tarball展開: native layer / manifest / APKを確認
 - native layer: Mach-O arm64、ad-hoc署名検証成功
-- APK: `com.maquestlink.questclient`、version `0.1.0`
+- APK: `com.metalquestlink.questclient`、version `0.2.0`
 - repository外packageのdoctor: error 0
 - tarball経由のrepository外Unity EditMode / Simulator PlayMode: 成功
 - 配布packageのlayer load / 接続待ち / doctor: 成功（error 0、Quest未接続warningのみ）

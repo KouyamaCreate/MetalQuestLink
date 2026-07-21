@@ -23,7 +23,7 @@
 
 namespace {
 
-namespace protocol = maquestlink::protocol;
+namespace protocol = metalquestlink::protocol;
 
 [[nodiscard]] bool set_close_on_exec(int fd) {
   const int flags = ::fcntl(fd, F_GETFD);
@@ -187,7 +187,7 @@ class TransportServer {
         }
       }
     } catch (const protocol::ProtocolError& error) {
-      std::cerr << "[MaQuestLink transport] protocol error: " << error.what() << '\n';
+      std::cerr << "[MetalQuestLink transport] protocol error: " << error.what() << '\n';
     }
     connection->close();
   }
@@ -198,7 +198,7 @@ class TransportServer {
       return;
     }
     if (!set_close_on_exec(server)) {
-      std::cerr << "[MaQuestLink transport] failed to protect server socket from exec\n";
+      std::cerr << "[MetalQuestLink transport] failed to protect server socket from exec\n";
       (void)::close(server);
       return;
     }
@@ -208,13 +208,13 @@ class TransportServer {
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(INADDR_ANY);
-    const char* port_value = std::getenv("MAQUESTLINK_PORT");
+    const char* port_value = std::getenv("METALQUESTLINK_PORT");
     const int port = port_value == nullptr ? 42424 : std::atoi(port_value);
     address.sin_port = htons(static_cast<std::uint16_t>(port));
     if (port <= 0 || port > 65535 ||
         ::bind(server, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0 ||
         ::listen(server, 1) != 0) {
-      std::cerr << "[MaQuestLink transport] failed to listen on TCP port " << port << '\n';
+      std::cerr << "[MetalQuestLink transport] failed to listen on TCP port " << port << '\n';
       close_server(server);
       return;
     }
@@ -222,12 +222,12 @@ class TransportServer {
       const int accepted = ::accept(server, nullptr, nullptr);
       if (accepted < 0) {
         if (!stop.stop_requested() && errno != EBADF && errno != EINVAL) {
-          std::cerr << "[MaQuestLink transport] accept failed: " << std::strerror(errno) << '\n';
+          std::cerr << "[MetalQuestLink transport] accept failed: " << std::strerror(errno) << '\n';
         }
         break;
       }
       if (!set_close_on_exec(accepted)) {
-        std::cerr << "[MaQuestLink transport] failed to protect client socket from exec\n";
+        std::cerr << "[MetalQuestLink transport] failed to protect client socket from exec\n";
         (void)::close(accepted);
         continue;
       }
@@ -309,12 +309,12 @@ class TransportServer {
 void transport_start() { TransportServer::instance().start(); }
 void transport_stop() { TransportServer::instance().stop(); }
 bool transport_connected() { return TransportServer::instance().connected(); }
-void transport_send(const maquestlink::protocol::Message& message) {
+void transport_send(const metalquestlink::protocol::Message& message) {
   TransportServer::instance().send_message(message);
 }
-std::optional<maquestlink::protocol::PoseInput> transport_latest_pose_input() {
+std::optional<metalquestlink::protocol::PoseInput> transport_latest_pose_input() {
   return TransportServer::instance().latest_pose_input();
 }
-std::optional<maquestlink::protocol::HandTrackingInput> transport_latest_hand_tracking() {
+std::optional<metalquestlink::protocol::HandTrackingInput> transport_latest_hand_tracking() {
   return TransportServer::instance().latest_hand_tracking();
 }

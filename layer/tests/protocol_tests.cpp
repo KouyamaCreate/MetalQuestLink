@@ -1,4 +1,4 @@
-#include "maquestlink/protocol.hpp"
+#include "metalquestlink/protocol.hpp"
 
 #include <algorithm>
 #include <cstdlib>
@@ -6,7 +6,7 @@
 #include <iostream>
 #include <string_view>
 
-namespace protocol = maquestlink::protocol;
+namespace protocol = metalquestlink::protocol;
 
 namespace {
 
@@ -147,9 +147,9 @@ void test_wire_is_little_endian() {
       .payload = protocol::ControlMessage{},
   };
   const auto bytes = protocol::serialize(message);
-  expect(bytes[0] == std::byte{0x4d} && bytes[1] == std::byte{0x51} &&
+  expect(bytes[0] == std::byte{0x4d} && bytes[1] == std::byte{0x54} &&
              bytes[2] == std::byte{0x4c} && bytes[3] == std::byte{0x4b},
-         "magic is little endian MQLK");
+         "magic is little endian MTLK");
   expect(bytes[12] == std::byte{0x08} && bytes[19] == std::byte{0x01},
          "sequence is little endian");
 }

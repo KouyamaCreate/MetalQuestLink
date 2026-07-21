@@ -1,0 +1,18 @@
+{
+  "name": "MetalQuestLink.QuestClient",
+  "rootNamespace": "MetalQuestLink.QuestClient",
+  "references": [
+    "Unity.XR.Hands",
+    "Unity.XR.OpenXR",
+    "Oculus.VR"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -4,7 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 
-namespace MaQuestLink.Editor
+namespace MetalQuestLink.Editor
 {
     public readonly struct AdbResult
     {
@@ -21,12 +21,12 @@ namespace MaQuestLink.Editor
 
     public static class AdbBridge
     {
-        public const string PackageName = "com.maquestlink.questclient";
+        public const string PackageName = "com.metalquestlink.questclient";
         public const string ActivityName = "com.unity3d.player.UnityPlayerGameActivity";
 
         public static AdbResult Reverse()
         {
-            var port = MaQuestLinkSettings.instance.port;
+            var port = MetalQuestLinkSettings.instance.port;
             return Run(BuildDeviceArguments($"reverse tcp:{port} tcp:{port}"));
         }
 
@@ -60,7 +60,7 @@ namespace MaQuestLink.Editor
             var adb = FindAdb();
             if (string.IsNullOrEmpty(adb))
             {
-                return new AdbResult(127, "adb was not found. Set its path in Window > MaQuestLink.");
+                return new AdbResult(127, "adb was not found. Set its path in Window > MetalQuestLink.");
             }
             try
             {
@@ -84,14 +84,14 @@ namespace MaQuestLink.Editor
 
         public static string BuildStartClientArguments()
         {
-            var settings = MaQuestLinkSettings.instance;
+            var settings = MetalQuestLinkSettings.instance;
             var arguments = $"shell am start -S -n {PackageName}/{ActivityName} " +
-                   $"--ei maquestlink_port {settings.port} " +
-                   $"--ez maquestlink_passthrough {BooleanArgument(settings.enablePassthroughPreview)} " +
-                   $"--ez maquestlink_hand_visualization {BooleanArgument(settings.showTrackedHands)}";
+                   $"--ei metalquestlink_port {settings.port} " +
+                   $"--ez metalquestlink_passthrough {BooleanArgument(settings.enablePassthroughPreview)} " +
+                   $"--ez metalquestlink_hand_visualization {BooleanArgument(settings.showTrackedHands)}";
             if (!string.IsNullOrWhiteSpace(settings.wifiFallbackHost))
             {
-                arguments += " --es maquestlink_wifi_host " + Quote(settings.wifiFallbackHost.Trim());
+                arguments += " --es metalquestlink_wifi_host " + Quote(settings.wifiFallbackHost.Trim());
             }
             return arguments;
         }
@@ -101,7 +101,7 @@ namespace MaQuestLink.Editor
             var adb = FindAdb();
             if (string.IsNullOrEmpty(adb))
             {
-                return new AdbResult(127, "adb was not found. Set its path in Window > MaQuestLink.");
+                return new AdbResult(127, "adb was not found. Set its path in Window > MetalQuestLink.");
             }
             return RunWithExecutable(adb, arguments, timeoutMilliseconds);
         }
@@ -161,7 +161,7 @@ namespace MaQuestLink.Editor
 
         public static string FindAdb()
         {
-            var configured = MaQuestLinkSettings.instance.adbPath;
+            var configured = MetalQuestLinkSettings.instance.adbPath;
             var configuredPath = OpenXRLayerInstaller.ResolveProjectPath(configured);
             if (!string.IsNullOrEmpty(configuredPath) && File.Exists(configuredPath))
             {
@@ -210,7 +210,7 @@ namespace MaQuestLink.Editor
 
         public static string BuildDeviceArguments(string arguments)
         {
-            var serial = MaQuestLinkSettings.instance.deviceSerial;
+            var serial = MetalQuestLinkSettings.instance.deviceSerial;
             return string.IsNullOrWhiteSpace(serial)
                 ? arguments
                 : $"-s {Quote(serial.Trim())} {arguments}";

@@ -1,7 +1,0 @@
-{
-  "name": "MaQuestLink.Editor.Tests",
-  "rootNamespace": "MaQuestLink.Editor.Tests",
-  "references": ["MaQuestLink.Editor"],
-  "includePlatforms": ["Editor"],
-  "optionalUnityReferences": ["TestAssemblies"]
-}

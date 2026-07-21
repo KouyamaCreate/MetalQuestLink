@@ -1,6 +1,6 @@
 # 実装進捗
 
-最終更新: 2026-07-15
+最終更新: 2026-07-21
 
 | Phase | 状態 | 検証 |
 |---|---|---|
@@ -13,6 +13,18 @@
 | 6 — 再投影・計測・ドキュメント | 完了 | world pose / clock unit 3/3、clock sync E2E、Phase 0〜5回帰成功 |
 | 7 — 配布パッケージング | 完了 | 配布4点・checksum・repository外tarball Unity/Simulator E2E・doctor成功 |
 | 8 — Quest機能の拡張対応 | 完了 | haptic / hand / passthrough mock E2E、Quest EditMode 9/9、Phase 0〜7回帰、Quest 3実機E2E成功 |
+| 9 — Build Week / Unity互換性 / OSS公開準備 | 進行中 | Unity 6000.2 / 6000.3 matrix成功、release smoke成功。2022.3はlicense未有効で保留 |
+
+## Phase 9
+
+- Unity 2022.3 LTSをEditor packageのresolver baselineとし、version番号だけで拒否しないcompatibility levelを追加した。
+- `Quick Setup (Project + Quest)`、Unity matrix test、英語judge guide、Devpost worksheet、3分demo構成を追加した。
+- Apache-2.0、contribution/security/conduct policy、CHANGELOG、Issue / PR templatesとdocs更新契約を追加した。
+- `scripts/test_unity_matrix.sh`: Unity 6000.2.5f1 / 6000.3.6f1で成功。2022.3.44f1はlocal Editor licenseがなくtest開始前にblocked。
+- `scripts/test_phase7.sh`: 新しいEditor packageを含むtarball再生成、checksum、repository外展開、doctor error 0に成功。
+- `scripts/test_phase7_clean.sh`: repository外の一時projectでtarball解決、EditMode、Meta XR Simulator PlayMode、layer load、doctor error 0に成功。
+- Devpostの`Untitled`草稿を`MetalQuestLink`へ更新し、tagline、説明、Built withを保存した。hackathonへの最終submissionは未実施。
+- 残り: YouTube URLと最終確認を行い、Devpostへ提出する。repository URL、`/feedback` Session ID、submitter type、居住国は入力する。
 
 ## Phase完了後の汎用パッケージ化
 
@@ -26,10 +38,10 @@
 
 - 成果物: CMakeスキャフォールド、共有バイナリプロトコル、単体テスト
 - 検証コマンド: `cmake -B build && cmake --build build`
-  - 結果: 成功。`maquestlink_protocol` と `maquestlink_protocol_tests` をビルドした。
+  - 結果: 成功。`metalquestlink_protocol` と `metalquestlink_protocol_tests` をビルドした。
 - 検証コマンド: `ctest --test-dir build --output-on-failure`
   - 結果: 成功。1/1 tests passed。
-- アーキテクチャ確認: `lipo -archs build/layer/maquestlink_protocol_tests`
+- アーキテクチャ確認: `lipo -archs build/layer/metalquestlink_protocol_tests`
   - 結果: `arm64`。
 - 判明した事実: AppleClang 17.0.0、cmake 4.3.1のローカル環境で受け入れ基準を満たした。
 
@@ -42,15 +54,15 @@
   - OpenXR loader interface v1対応のpass-through API layerとimplicit manifest
   - `scripts/test_phase1.sh` による再実行可能なE2E
 - clean build:
-  - `cmake -S . -B /private/tmp/maquestlink-phase1-clean-20260715`
-  - `cmake --build /private/tmp/maquestlink-phase1-clean-20260715 --parallel`
+  - `cmake -S . -B /private/tmp/metalquestlink-phase1-clean-20260715`
+  - `cmake --build /private/tmp/metalquestlink-phase1-clean-20260715 --parallel`
   - 結果: 成功。native clientとlayerはいずれもarm64。
 - regression: `ctest --test-dir build --output-on-failure`
   - 結果: 成功。1/1 tests passed。
 - native E2E: `scripts/test_phase1.sh`
   - 結果: 成功。Meta XR Simulator 201.0.0、`XR_KHR_metal_enable`、Apple M4 Pro Metal deviceを確認。
   - 120フレームのstereo swapchain描画と `xrEndFrame` が完了。
-  - loader logで `XR_APILAYER_MAQUESTLINK_streaming` のロードを確認。
+  - loader logで `XR_APILAYER_METALQUESTLINK_streaming` のロードを確認。
   - layer固有ログでnegotiate、instance load、destroyを確認。
 - 詳細な実測結果: `docs/notes.md` の「Phase 1」を参照。
 
@@ -60,7 +72,7 @@
   - OpenXR session/swapchain追跡と `xrEndFrame` hook
   - Metalによる左右眼side-by-side copyとVideoToolbox H.264 low-latency encoder
   - host monotonic timestamp、左右眼pose/FOV付きVideoFrameのTCP送信
-  - VideoToolboxで実デコードする `maquestlink_mock_viewer`
+  - VideoToolboxで実デコードする `metalquestlink_mock_viewer`
   - 未接続/接続の両経路を検証する `scripts/test_phase2.sh`
 - build/regression:
   - `cmake --build build -j8`
@@ -109,7 +121,7 @@
 - APK build:
   - `scripts/build_quest_client.sh`
   - 結果: 成功。Unity 6000.3.6f1のbatch mode、IL2CPP、ARM64。APK 42 MiB。
-  - `aapt dump badging` でpackage `com.maquestlink.questclient`、version `0.1.0`、minSdk 32、targetSdk 36、`UnityPlayerGameActivity`、`arm64-v8a`、Quest headtracking featureを確認。
+  - `aapt dump badging` でpackage `com.metalquestlink.questclient`、version `0.1.0`、minSdk 32、targetSdk 36、`UnityPlayerGameActivity`、`arm64-v8a`、Quest headtracking featureを確認。
   - Quest 3 / 3Sのみを対象とし、Quest Pro専用eye-tracking feature/permissionが入らないことを確認。
 - device E2E:
   - `scripts/e2e_device.sh`
@@ -120,9 +132,9 @@
 ## Phase 5
 
 - 成果物:
-  - local UPM package `com.maquestlink.editor`
+  - local UPM package `com.metalquestlink.editor`
   - implicit OpenXR layer自動登録、Play開始前の環境設定、`adb reverse`とQuest client自動起動
-  - connection / fps / copy・encode latencyを表示する `Window > MaQuestLink`
+  - connection / fps / copy・encode latencyを表示する `Window > MetalQuestLink`
   - APK install、client起動、layer再登録の操作ボタン
   - `OVRCameraRig`、左右`OVRGrabber`、`OVRGrabbable` cubeを持つ `samples/MetaXRMinimal`
   - Unity EditMode / PlayModeを連続検証する `scripts/test_phase5.sh`
@@ -136,7 +148,7 @@
   - Quest未接続状態で `connected=false` のstatus JSONと `status=waiting_for_connection` logを確認した。
 - 新規導入手順:
   - Package Managerで `editor-package/` を導入する。
-  - `Window > MaQuestLink` で `Install Quest APK` を1回実行する。
+  - `Window > MetalQuestLink` で `Install Quest APK` を1回実行する。
   - Meta XR Simulatorを選択してPlayする。layer登録、adb reverse、client起動は自動実行される。
 - 詳細な実測結果: `docs/notes.md` の「Phase 5」を参照。
 
@@ -169,7 +181,7 @@
 ## Phase 7
 
 - 成果物:
-  - arm64 ad-hoc signed layer、manifest、Quest APKを同梱する自己完結`com.maquestlink.editor`
+  - arm64 ad-hoc signed layer、manifest、Quest APKを同梱する自己完結`com.metalquestlink.editor`
   - UPM tarball / APK / `SHA256SUMS` / `VERSION`を作る`scripts/build_release.sh`
   - package・登録・Simulator・adb・端末APKを日本語診断する`scripts/doctor.sh`
   - repository外展開smoke testとtarball経由clean Unity/Simulator E2E
@@ -209,7 +221,14 @@
   - 最終出力は`Phase 0-8 regression passed (device result: 2)`。device result 2はQuest未接続の保留を表す。
 - Quest device E2E:
   - Quest 3 (`eureka`)をUSB接続し、`scripts/e2e_device.sh`が成功。
-  - 最終配布APKで`MAQUESTLINK_DEVICE_E2E_OK received_fps=74 decode_fps=76 pose_hz=73 capture_to_decode_ms=140.498283 hands_sent=2113 haptics_received=34 passthrough=1`。
+  - 最終配布APKで`METALQUESTLINK_DEVICE_E2E_OK received_fps=74 decode_fps=76 pose_hz=73 capture_to_decode_ms=140.498283 hands_sent=2113 haptics_received=34 passthrough=1`。
   - MediaCodec Surface release、world-fixed、clock sync、Pose / hand送信、Touch haptic command受信、Passthrough underlay設定を同時に確認した。装着時の見え方と振動体感は別途目視確認が必要。
   - 装着追試で左右の診断用hand skeletonと指開閉、Passthroughを目視確認した。active jointは52/52。
   - Play即時preview統合後のEditor EditMode 4/4、sample PlayMode 1/1が成功。Play時はAPKを再buildせずインストール済みclientを起動する。
+
+## Phase 9
+
+- 製品名と公開identifierを`MetalQuestLink` / `metalquestlink`へ統一し、breaking releaseを`0.2.0`に更新。
+- native build / CTest 1/1、Quest EditMode 12/12、Quest IL2CPP APK build、Unity 6000.2 / 6000.3 matrix、release smoke、repository外clean tarball Unity / Simulator E2Eに成功。
+- APKはpackage `com.metalquestlink.questclient`、version `0.2.0`。UPM tarball / APK / VERSIONのchecksumを検証済み。
+- Devpostの表示名・tagline・説明を更新。既存URL slugはconnectorから変更できないため、手動作業として分離した。

@@ -12,7 +12,7 @@
 
 namespace {
 
-constexpr const char* kLogTag = "MaQuestLinkProjection";
+constexpr const char* kLogTag = "MetalQuestLinkProjection";
 
 struct StreamView {
   XrPosef pose{};
@@ -152,14 +152,14 @@ void destroy_surface_swapchain_locked() {
 }  // namespace
 
 extern "C" __attribute__((visibility("default"))) PFN_xrGetInstanceProcAddr
-maquestlink_projection_hook_get_instance_proc_addr(PFN_xrGetInstanceProcAddr old) {
+metalquestlink_projection_hook_get_instance_proc_addr(PFN_xrGetInstanceProcAddr old) {
   std::scoped_lock lock(g_mutex);
   g_next_gipa = old;
   log_line("installed xrGetInstanceProcAddr hook");
   return hook_get_instance_proc_addr;
 }
 
-extern "C" __attribute__((visibility("default"))) void maquestlink_projection_set_instance(
+extern "C" __attribute__((visibility("default"))) void metalquestlink_projection_set_instance(
     XrInstance instance) {
   std::scoped_lock lock(g_mutex);
   g_state.instance = instance;
@@ -167,21 +167,21 @@ extern "C" __attribute__((visibility("default"))) void maquestlink_projection_se
   log_line("received OpenXR instance");
 }
 
-extern "C" __attribute__((visibility("default"))) void maquestlink_projection_set_session(
+extern "C" __attribute__((visibility("default"))) void metalquestlink_projection_set_session(
     XrSession session) {
   std::scoped_lock lock(g_mutex);
   g_state.session = session;
   log_line("received OpenXR session");
 }
 
-extern "C" __attribute__((visibility("default"))) void maquestlink_projection_set_app_space(
+extern "C" __attribute__((visibility("default"))) void metalquestlink_projection_set_app_space(
     XrSpace space) {
   std::scoped_lock lock(g_mutex);
   g_state.app_space = space;
 }
 
 extern "C" __attribute__((visibility("default"))) XrResult
-maquestlink_projection_create_surface(std::uint32_t width, std::uint32_t height, jobject* surface) {
+metalquestlink_projection_create_surface(std::uint32_t width, std::uint32_t height, jobject* surface) {
   if (surface == nullptr || width < 2 || height < 2 || (width % 2) != 0) {
     return XR_ERROR_VALIDATION_FAILURE;
   }
@@ -224,7 +224,7 @@ maquestlink_projection_create_surface(std::uint32_t width, std::uint32_t height,
   return XR_SUCCESS;
 }
 
-extern "C" __attribute__((visibility("default"))) void maquestlink_projection_update_frame(
+extern "C" __attribute__((visibility("default"))) void metalquestlink_projection_update_frame(
     const StreamView* views, std::uint32_t view_count, bool passthrough) {
   if (views == nullptr || view_count != 2) return;
   std::scoped_lock lock(g_mutex);
@@ -234,7 +234,7 @@ extern "C" __attribute__((visibility("default"))) void maquestlink_projection_up
   g_state.frame_ready = true;
 }
 
-extern "C" __attribute__((visibility("default"))) void maquestlink_projection_reset_session() {
+extern "C" __attribute__((visibility("default"))) void metalquestlink_projection_reset_session() {
   std::scoped_lock lock(g_mutex);
   destroy_surface_swapchain_locked();
   g_state.session = XR_NULL_HANDLE;

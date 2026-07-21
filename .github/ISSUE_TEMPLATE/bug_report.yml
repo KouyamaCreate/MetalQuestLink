@@ -1,0 +1,38 @@
+name: Bug report
+description: Report a reproducible MetalQuestLink problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not report security vulnerabilities here; use private vulnerability reporting.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include expected and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: input
+    id: unity
+    attributes:
+      label: Unity version
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: macOS, Mac, Quest, and Meta XR Simulator versions
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Doctor output and sanitized logs
+      description: Remove credentials, private paths, and device identifiers.

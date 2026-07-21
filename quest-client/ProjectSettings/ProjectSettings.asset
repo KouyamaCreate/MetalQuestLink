@@ -12,8 +12,8 @@ PlayerSettings:
   targetDevice: 2
   useOnDemandResources: 0
   accelerometerFrequency: 60
-  companyName: MaQuestLink
-  productName: MaQuestLink
+  companyName: MetalQuestLink
+  productName: MetalQuestLink
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
   m_SplashScreenBackgroundColor: {r: 0.12156863, g: 0.12156863, b: 0.1254902, a: 1}
@@ -143,7 +143,7 @@ PlayerSettings:
   loadStoreDebugModeEnabled: 0
   visionOSBundleVersion: 1.0
   tvOSBundleVersion: 1.0
-  bundleVersion: 0.1.0
+  bundleVersion: 0.2.0
   preloadedAssets:
   - {fileID: 11400000, guid: 4abc4893c095149299762b6ceb013363, type: 2}
   metroInputSource: 0
@@ -167,7 +167,7 @@ PlayerSettings:
   androidMaxAspectRatio: 2.4
   androidMinAspectRatio: 1
   applicationIdentifier:
-    Android: com.maquestlink.questclient
+    Android: com.metalquestlink.questclient
   buildNumber:
     Standalone: 0
     VisionOS: 0

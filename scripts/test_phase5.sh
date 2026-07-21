@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 UNITY="${UNITY:-/Applications/Unity/Hub/Editor/6000.3.6f1/Unity.app/Contents/MacOS/Unity}"
-SIM_APP="${MAQUESTLINK_SIM_APP:-/Applications/MetaXRSimulator.app}"
+SIM_APP="${METALQUESTLINK_SIM_APP:-/Applications/MetaXRSimulator.app}"
 RUNTIME_JSON="${SIM_APP}/Contents/Resources/MetaXRSimulator/meta_openxr_simulator.json"
 PROJECT="${ROOT_DIR}/samples/MetaXRMinimal"
 BUILD_LOG="${ROOT_DIR}/build/phase5-sample-build.log"
@@ -11,7 +11,7 @@ EDIT_LOG="${ROOT_DIR}/build/phase5-editmode.log"
 PLAY_LOG="${ROOT_DIR}/build/phase5-playmode.log"
 EDIT_RESULTS="${ROOT_DIR}/build/phase5-editmode-results.xml"
 PLAY_RESULTS="${ROOT_DIR}/build/phase5-playmode-results.xml"
-META_CORE_LOCAL="${MAQUESTLINK_META_CORE_LOCAL:-/private/tmp/meta-xr-core-203-full/package}"
+META_CORE_LOCAL="${METALQUESTLINK_META_CORE_LOCAL:-/private/tmp/meta-xr-core-203-full/package}"
 MANIFEST="${PROJECT}/Packages/manifest.json"
 MANIFEST_BACKUP="${ROOT_DIR}/build/phase5-manifest.json"
 LOCK="${PROJECT}/Packages/packages-lock.json"
@@ -43,7 +43,7 @@ if [[ ! -f "${RUNTIME_JSON}" ]]; then
   echo "Meta XR Simulator runtime manifest not found: ${RUNTIME_JSON}" >&2
   exit 2
 fi
-if [[ ! -f "${ROOT_DIR}/build/layer/libmaquestlink_openxr_layer.so" ]]; then
+if [[ ! -f "${ROOT_DIR}/build/layer/libmetalquestlink_openxr_layer.so" ]]; then
   echo "Native layer not built. Run: cmake -B build && cmake --build build" >&2
   exit 2
 fi
@@ -64,7 +64,7 @@ fi
   -nographics \
   -quit \
   -projectPath "${PROJECT}" \
-  -executeMethod MaQuestLink.Sample.Editor.SampleBuilder.ConfigureAndBuild \
+  -executeMethod MetalQuestLink.Sample.Editor.SampleBuilder.ConfigureAndBuild \
   -logFile "${BUILD_LOG}"
 
 "${UNITY}" \
@@ -73,27 +73,27 @@ fi
   -projectPath "${PROJECT}" \
   -runTests \
   -testPlatform EditMode \
-  -testFilter MaQuestLink.Editor.Tests \
+  -testFilter MetalQuestLink.Editor.Tests \
   -testResults "${EDIT_RESULTS}" \
   -logFile "${EDIT_LOG}"
 
 open -a "${SIM_APP}" >/dev/null 2>&1
 
 XR_RUNTIME_JSON="${RUNTIME_JSON}" \
-MAQUESTLINK_ENABLE_API_LAYER=1 \
+METALQUESTLINK_ENABLE_API_LAYER=1 \
   "${UNITY}" \
   -batchmode \
   -projectPath "${PROJECT}" \
   -runTests \
   -testPlatform PlayMode \
-  -testFilter MaQuestLink.Sample.Tests.SamplePlayModeTests \
+  -testFilter MetalQuestLink.Sample.Tests.SamplePlayModeTests \
   -testResults "${PLAY_RESULTS}" \
   -logFile "${PLAY_LOG}"
 
 rg -q 'result="Passed"' "${EDIT_RESULTS}"
 rg -q 'result="Passed"' "${PLAY_RESULTS}"
-rg -q 'MAQUESTLINK_SAMPLE_PLAY_VERIFIED layer=loaded status=(connected|waiting_for_connection)' "${PLAY_LOG}"
-rg -q 'loaded instance for' "${PROJECT}/Library/MaQuestLink/layer.log"
+rg -q 'METALQUESTLINK_SAMPLE_PLAY_VERIFIED layer=loaded status=(connected|waiting_for_connection)' "${PLAY_LOG}"
+rg -q 'loaded instance for' "${PROJECT}/Library/MetalQuestLink/layer.log"
 
 echo "Phase 5 Unity Editor integration passed"
 echo "Build log: ${BUILD_LOG}"

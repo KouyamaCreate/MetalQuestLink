@@ -30,9 +30,9 @@ PACKAGE_ROOT="$(cd "$PACKAGE_ROOT" 2>/dev/null && pwd)" || {
   echo "[エラー] package directoryがありません: $PACKAGE_ROOT" >&2
   exit 1
 }
-layer="$PACKAGE_ROOT/Native~/macOS/libmaquestlink_openxr_layer.so"
-bundled_manifest="$PACKAGE_ROOT/Native~/macOS/XrApiLayer_maquestlink.json"
-apk="$PACKAGE_ROOT/QuestClient~/MaQuestLink.apk"
+layer="$PACKAGE_ROOT/Native~/macOS/libmetalquestlink_openxr_layer.so"
+bundled_manifest="$PACKAGE_ROOT/Native~/macOS/XrApiLayer_metalquestlink.json"
+apk="$PACKAGE_ROOT/QuestClient~/MetalQuestLink.apk"
 package_json="$PACKAGE_ROOT/package.json"
 version_file="$PACKAGE_ROOT/VERSION"
 
@@ -88,7 +88,7 @@ if [[ -n "$aapt" && -x "$aapt" && -s "$apk" ]]; then
   apk_badging="$($aapt dump badging "$apk" 2>/dev/null | head -1)"
   apk_package="$(printf '%s\n' "$apk_badging" | sed -nE "s/.*package: name='([^']+)'.*/\1/p")"
   apk_version="$(printf '%s\n' "$apk_badging" | sed -nE "s/.*versionName='([^']+)'.*/\1/p")"
-  [[ "$apk_package" == "com.maquestlink.questclient" ]] \
+  [[ "$apk_package" == "com.metalquestlink.questclient" ]] \
     && ok "Quest APK package: $apk_package" \
     || fail "Quest APK package名が不正です: $apk_package"
   [[ "$apk_version" == "$package_version" ]] \
@@ -98,14 +98,14 @@ else
   warn "aaptが見つからないため、同梱APKのversion検査を省略しました"
 fi
 
-manifest_dir="${MAQUESTLINK_MANIFEST_DIR:-$HOME/.local/share/openxr/1/api_layers/implicit.d}"
-manifest="$manifest_dir/XrApiLayer_maquestlink.json"
+manifest_dir="${METALQUESTLINK_MANIFEST_DIR:-$HOME/.local/share/openxr/1/api_layers/implicit.d}"
+manifest="$manifest_dir/XrApiLayer_metalquestlink.json"
 if [[ "$REGISTER" == "1" && -s "$layer" ]]; then
   escaped_layer="${layer//\\/\\\\}"
   escaped_layer="${escaped_layer//\"/\\\"}"
-  register_tmp="${TMPDIR:-/tmp}/XrApiLayer_maquestlink.$$.json"
+  register_tmp="${TMPDIR:-/tmp}/XrApiLayer_metalquestlink.$$.json"
   if mkdir -p "$manifest_dir" 2>/dev/null \
-    && sed "s|\"library_path\": \"libmaquestlink_openxr_layer.so\"|\"library_path\": \"$escaped_layer\"|" \
+    && sed "s|\"library_path\": \"libmetalquestlink_openxr_layer.so\"|\"library_path\": \"$escaped_layer\"|" \
       "$bundled_manifest" > "$register_tmp" \
     && install -m 644 "$register_tmp" "$manifest" 2>/dev/null; then
     ok "layer manifestを登録しました: $manifest"
@@ -120,7 +120,7 @@ else
   fail "implicit layerがこのpackageへ登録されていません。Unityでpackageを読み直すか --register を実行してください"
 fi
 
-sim_app="${MAQUESTLINK_SIM_APP:-/Applications/MetaXRSimulator.app}"
+sim_app="${METALQUESTLINK_SIM_APP:-/Applications/MetaXRSimulator.app}"
 if [[ -f "$sim_app/Contents/Resources/MetaXRSimulator/meta_openxr_simulator.json" ]]; then
   ok "Meta XR Simulator: $sim_app"
 else
@@ -148,9 +148,9 @@ if [[ -n "$adb" && -x "$adb" ]]; then
   device_count="$(printf '%s\n' "$device_lines" | awk 'NF { count++ } END { print count + 0 }')"
   if [[ "$device_count" -eq 1 ]]; then
     ok "Quest/Android device接続: $device_lines"
-    installed_version="$($adb shell dumpsys package com.maquestlink.questclient 2>/dev/null | sed -nE 's/.*versionName=([^[:space:]]+).*/\1/p' | head -1)"
+    installed_version="$($adb shell dumpsys package com.metalquestlink.questclient 2>/dev/null | sed -nE 's/.*versionName=([^[:space:]]+).*/\1/p' | head -1)"
     if [[ -z "$installed_version" ]]; then
-      warn "QuestにMaQuestLink APKが未installです。Unity windowからinstallしてください"
+      warn "QuestにMetalQuestLink APKが未installです。Unity windowからinstallしてください"
     elif [[ "$installed_version" == "$package_version" ]]; then
       ok "Quest APK version: $installed_version"
     else

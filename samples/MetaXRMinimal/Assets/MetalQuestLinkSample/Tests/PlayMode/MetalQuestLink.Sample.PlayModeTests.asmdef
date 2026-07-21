@@ -1,0 +1,7 @@
+{
+  "name": "MetalQuestLink.Sample.PlayModeTests",
+  "rootNamespace": "MetalQuestLink.Sample.Tests",
+  "references": ["Oculus.VR"],
+  "includePlatforms": [],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

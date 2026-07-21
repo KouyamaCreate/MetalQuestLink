@@ -6,7 +6,7 @@ UNITY="${UNITY:-/Applications/Unity/Hub/Editor/6000.3.6f1/Unity.app/Contents/Mac
 UNITY_APP="${UNITY%/Contents/MacOS/Unity}"
 UNITY_ROOT="${UNITY_APP%/Unity.app}"
 NDK="$UNITY_ROOT/PlaybackEngines/AndroidPlayer/NDK"
-BUILD_DIR="${MAQUESTLINK_PROJECTION_BUILD_DIR:-$ROOT_DIR/build-android-projection}"
+BUILD_DIR="${METALQUESTLINK_PROJECTION_BUILD_DIR:-$ROOT_DIR/build-android-projection}"
 OUTPUT_DIR="$ROOT_DIR/quest-client/Assets/Plugins/Android/arm64-v8a"
 
 [[ -f "$NDK/build/cmake/android.toolchain.cmake" ]] || {
@@ -14,7 +14,7 @@ OUTPUT_DIR="$ROOT_DIR/quest-client/Assets/Plugins/Android/arm64-v8a"
   exit 2
 }
 
-OPENXR_SOURCE="${MAQUESTLINK_OPENXR_SOURCE_DIR:-}"
+OPENXR_SOURCE="${METALQUESTLINK_OPENXR_SOURCE_DIR:-}"
 if [[ -z "$OPENXR_SOURCE" && -f "$ROOT_DIR/build/CMakeCache.txt" ]]; then
   OPENXR_SOURCE="$(sed -n 's|^FETCHCONTENT_SOURCE_DIR_OPENXR_SDK:PATH=||p' "$ROOT_DIR/build/CMakeCache.txt" | head -1)"
 fi
@@ -38,8 +38,8 @@ cmake -S "$ROOT_DIR/quest-client/NativeProjection" -B "$BUILD_DIR" \
   -DANDROID_STL=c++_shared \
   -DCMAKE_BUILD_TYPE=Release \
   -DOPENXR_INCLUDE_DIR="$OPENXR_SOURCE/include"
-cmake --build "$BUILD_DIR" --config Release -j "${MAQUESTLINK_BUILD_JOBS:-8}"
+cmake --build "$BUILD_DIR" --config Release -j "${METALQUESTLINK_BUILD_JOBS:-8}"
 mkdir -p "$OUTPUT_DIR"
-install -m 755 "$BUILD_DIR/libmaquestlink_projection.so" "$OUTPUT_DIR/libmaquestlink_projection.so"
-file "$OUTPUT_DIR/libmaquestlink_projection.so" | grep -q 'ELF 64-bit LSB shared object, ARM aarch64'
-echo "MaQuestLink immersive projection: $OUTPUT_DIR/libmaquestlink_projection.so"
+install -m 755 "$BUILD_DIR/libmetalquestlink_projection.so" "$OUTPUT_DIR/libmetalquestlink_projection.so"
+file "$OUTPUT_DIR/libmetalquestlink_projection.so" | grep -q 'ELF 64-bit LSB shared object, ARM aarch64'
+echo "MetalQuestLink immersive projection: $OUTPUT_DIR/libmetalquestlink_projection.so"

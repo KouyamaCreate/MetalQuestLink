@@ -1,0 +1,7 @@
+{
+  "name": "MetalQuestLink.Sample.Demo",
+  "rootNamespace": "MetalQuestLink.Sample",
+  "references": [],
+  "includePlatforms": [],
+  "autoReferenced": true
+}

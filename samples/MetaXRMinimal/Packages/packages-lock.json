@@ -1,11 +1,5 @@
 {
   "dependencies": {
-    "com.maquestlink.editor": {
-      "version": "file:../../../editor-package",
-      "depth": 0,
-      "source": "local",
-      "dependencies": {}
-    },
     "com.meta.xr.sdk.core": {
       "version": "203.0.0",
       "depth": 0,
@@ -20,6 +14,15 @@
         "com.unity.xr.hands": "1.7.2"
       },
       "url": "https://npm.developer.oculus.com"
+    },
+    "com.metalquestlink.editor": {
+      "version": "file:../../../editor-package",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {
+        "com.unity.xr.management": "4.4.0",
+        "com.unity.xr.openxr": "1.8.2"
+      }
     },
     "com.unity.editorcoroutines": {
       "version": "1.0.1",

@@ -14,7 +14,7 @@
 
 namespace {
 
-constexpr const char* kLayerName = "XR_APILAYER_MAQUESTLINK_streaming";
+constexpr const char* kLayerName = "XR_APILAYER_METALQUESTLINK_streaming";
 
 struct InstanceDispatch {
   PFN_xrGetInstanceProcAddr get_instance_proc_addr{};
@@ -25,8 +25,8 @@ std::map<XrInstance, InstanceDispatch> g_instances;
 
 void log_line(const std::string& message) {
   std::scoped_lock lock(g_mutex);
-  std::cerr << "[MaQuestLink layer] " << message << '\n';
-  if (const char* path = std::getenv("MAQUESTLINK_LAYER_LOG"); path != nullptr && path[0] != '\0') {
+  std::cerr << "[MetalQuestLink layer] " << message << '\n';
+  if (const char* path = std::getenv("METALQUESTLINK_LAYER_LOG"); path != nullptr && path[0] != '\0') {
     std::ofstream stream(path, std::ios::app);
     stream << message << '\n';
   }

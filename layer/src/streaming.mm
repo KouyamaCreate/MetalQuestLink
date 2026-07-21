@@ -24,13 +24,13 @@
 #include <vector>
 
 #include "input_injection.hpp"
-#include "maquestlink/protocol.hpp"
+#include "metalquestlink/protocol.hpp"
 #include "streaming.hpp"
 #include "transport.hpp"
 
 namespace {
 
-namespace protocol = maquestlink::protocol;
+namespace protocol = metalquestlink::protocol;
 
 struct InstanceData {
   PFN_xrGetInstanceProcAddr gipa{};
@@ -123,15 +123,15 @@ std::uint64_t g_last_status_frames{};
 }
 
 void log_streaming_line(const std::string& message) {
-  std::cerr << "[MaQuestLink streaming] " << message << '\n';
-  if (const char* path = std::getenv("MAQUESTLINK_LAYER_LOG"); path != nullptr && path[0] != '\0') {
+  std::cerr << "[MetalQuestLink streaming] " << message << '\n';
+  if (const char* path = std::getenv("METALQUESTLINK_LAYER_LOG"); path != nullptr && path[0] != '\0') {
     std::ofstream stream(path, std::ios::app);
     stream << message << '\n';
   }
 }
 
 void write_status(bool force = false) {
-  const char* status_path = std::getenv("MAQUESTLINK_STATUS_FILE");
+  const char* status_path = std::getenv("METALQUESTLINK_STATUS_FILE");
   if (status_path == nullptr || *status_path == '\0') {
     return;
   }
@@ -254,7 +254,7 @@ void compression_callback(void*, void* source_ref, OSStatus status,
                                    metadata->copy_duration_ns;
   const std::uint64_t total_encode = g_total_encode_ns.fetch_add(encode_ns) + encode_ns;
   if (frame_count % 60 == 0) {
-    std::cerr << "MAQUESTLINK_VIDEO_STATS frames=" << frame_count
+    std::cerr << "METALQUESTLINK_VIDEO_STATS frames=" << frame_count
               << " avg_copy_ms=" << (static_cast<double>(total_copy) / frame_count / 1'000'000.0)
               << " avg_encode_ms=" << (static_cast<double>(total_encode) / frame_count / 1'000'000.0)
               << "\n";
@@ -295,7 +295,7 @@ class VideoEncoder {
               std::uint64_t capture_timestamp_ns, bool passthrough, bool force_keyframe) {
     std::scoped_lock lock(mutex_);
     const std::uint32_t max_pending =
-        environment_uint("MAQUESTLINK_MAX_PENDING_FRAMES", 2, 1, 8);
+        environment_uint("METALQUESTLINK_MAX_PENDING_FRAMES", 2, 1, 8);
     if (g_pending_encodes.load() >= max_pending) {
       g_dropped_frames.fetch_add(1);
       return;
@@ -547,7 +547,7 @@ kernel void copyRgbaEye2D(texture2d<float, access::read> source [[texture(0)]],
     (void)VTSessionSetProperty(session_, kVTCompressionPropertyKey_ProfileLevel,
                               kVTProfileLevel_H264_Main_AutoLevel);
     const std::uint32_t configured_mbps =
-        environment_uint("MAQUESTLINK_BITRATE_MBPS", 0, 0, 80);
+        environment_uint("METALQUESTLINK_BITRATE_MBPS", 0, 0, 80);
     const double baseline_pixels = 3360.0 * 1760.0;
     const int auto_mbps = std::clamp(
         static_cast<int>(20.0 * static_cast<double>(width) * height / baseline_pixels), 8, 40);
@@ -571,7 +571,7 @@ kernel void copyRgbaEye2D(texture2d<float, access::read> source [[texture(0)]],
                        std::to_string(height) + " bitrateMbps=" +
                        std::to_string(bit_rate / 1'000'000) + " maxPending=" +
                        std::to_string(environment_uint(
-                           "MAQUESTLINK_MAX_PENDING_FRAMES", 2, 1, 8)));
+                           "METALQUESTLINK_MAX_PENDING_FRAMES", 2, 1, 8)));
     return VTCompressionSessionPrepareToEncodeFrames(session_) == noErr;
   }
 

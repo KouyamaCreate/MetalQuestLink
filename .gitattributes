@@ -1,0 +1,18 @@
+* text=auto
+
+*.cs text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.mm text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.meta text eol=lf
+*.unity text eol=lf
+*.asset text eol=lf
+
+*.apk binary
+*.so binary
+*.tgz binary

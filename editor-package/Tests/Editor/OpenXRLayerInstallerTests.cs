@@ -4,7 +4,7 @@ using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace MaQuestLink.Editor.Tests
+namespace MetalQuestLink.Editor.Tests
 {
     public sealed class OpenXRLayerInstallerTests
     {
@@ -13,14 +13,14 @@ namespace MaQuestLink.Editor.Tests
         [SetUp]
         public void SetUp()
         {
-            manifestDirectory = Path.Combine(Path.GetTempPath(), "maquestlink-manifest-" + Guid.NewGuid());
-            Environment.SetEnvironmentVariable("MAQUESTLINK_MANIFEST_DIR", manifestDirectory);
+            manifestDirectory = Path.Combine(Path.GetTempPath(), "metalquestlink-manifest-" + Guid.NewGuid());
+            Environment.SetEnvironmentVariable("METALQUESTLINK_MANIFEST_DIR", manifestDirectory);
         }
 
         [TearDown]
         public void TearDown()
         {
-            Environment.SetEnvironmentVariable("MAQUESTLINK_MANIFEST_DIR", null);
+            Environment.SetEnvironmentVariable("METALQUESTLINK_MANIFEST_DIR", null);
             if (Directory.Exists(manifestDirectory))
             {
                 Directory.Delete(manifestDirectory, true);
@@ -33,8 +33,8 @@ namespace MaQuestLink.Editor.Tests
             var path = OpenXRLayerInstaller.RegisterLayer();
             var json = File.ReadAllText(path);
             StringAssert.Contains(OpenXRLayerInstaller.LayerName, json);
-            StringAssert.Contains("libmaquestlink_openxr_layer.so", json);
-            StringAssert.Contains("MAQUESTLINK_ENABLE_API_LAYER", json);
+            StringAssert.Contains("libmetalquestlink_openxr_layer.so", json);
+            StringAssert.Contains("METALQUESTLINK_ENABLE_API_LAYER", json);
             StringAssert.Contains("XR_EXT_hand_tracking", json);
         }
 
@@ -50,10 +50,11 @@ namespace MaQuestLink.Editor.Tests
 
             var packageRoot = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(library), "..", ".."));
             var bundledManifest = Path.Combine(
-                packageRoot, "Native~", "macOS", "XrApiLayer_maquestlink.json");
+                packageRoot, "Native~", "macOS", "XrApiLayer_metalquestlink.json");
             Assert.That(File.Exists(bundledManifest), Is.True, bundledManifest);
             var packageJson = File.ReadAllText(Path.Combine(packageRoot, "package.json"));
-            StringAssert.Contains("\"com.unity.xr.openxr\": \"1.15.1\"", packageJson);
+            StringAssert.Contains("\"unity\": \"2022.3\"", packageJson);
+            StringAssert.Contains("\"com.unity.xr.openxr\": \"1.8.2\"", packageJson);
         }
 
         [Test]
@@ -82,7 +83,7 @@ namespace MaQuestLink.Editor.Tests
         [Test]
         public void QuestClientLaunchIncludesRealtimePreviewOptions()
         {
-            var settings = MaQuestLinkSettings.instance;
+            var settings = MetalQuestLinkSettings.instance;
             var originalPort = settings.port;
             var originalPassthrough = settings.enablePassthroughPreview;
             var originalHands = settings.showTrackedHands;
@@ -101,10 +102,10 @@ namespace MaQuestLink.Editor.Tests
 
                 StringAssert.Contains("am start -S", arguments);
                 StringAssert.Contains(AdbBridge.PackageName + "/" + AdbBridge.ActivityName, arguments);
-                StringAssert.Contains("--ei maquestlink_port 42424", arguments);
-                StringAssert.Contains("--ez maquestlink_passthrough true", arguments);
-                StringAssert.Contains("--ez maquestlink_hand_visualization true", arguments);
-                StringAssert.Contains("--es maquestlink_wifi_host \"192.168.1.20\"", arguments);
+                StringAssert.Contains("--ei metalquestlink_port 42424", arguments);
+                StringAssert.Contains("--ez metalquestlink_passthrough true", arguments);
+                StringAssert.Contains("--ez metalquestlink_hand_visualization true", arguments);
+                StringAssert.Contains("--es metalquestlink_wifi_host \"192.168.1.20\"", arguments);
                 StringAssert.StartsWith("-s \"QUEST SERIAL\" ", selectedArguments);
             }
             finally
@@ -139,13 +140,26 @@ namespace MaQuestLink.Editor.Tests
 
         [TestCase("6000.2.5f1", 6000, 2)]
         [TestCase("6000.3.6f1", 6000, 3)]
+        [TestCase("2022.3.44f1", 2022, 3)]
         public void UnityVersionParserAcceptsSupportedVersionShape(
             string version, int expectedMajor, int expectedMinor)
         {
-            Assert.That(MaQuestLinkPreflight.TryGetUnityMajorMinor(
+            Assert.That(MetalQuestLinkPreflight.TryGetUnityMajorMinor(
                 version, out var major, out var minor), Is.True);
             Assert.That(major, Is.EqualTo(expectedMajor));
             Assert.That(minor, Is.EqualTo(expectedMinor));
+        }
+
+        [TestCase("2022.3.44f1", true, false)]
+        [TestCase("6000.0.50f1", true, false)]
+        [TestCase("6000.2.5f1", true, true)]
+        [TestCase("2021.3.48f1", false, false)]
+        public void UnityCompatibilityUsesBaselineAndVerifiedMatrix(
+            string version, bool supported, bool verified)
+        {
+            var compatibility = MetalQuestLinkPreflight.GetUnityCompatibility(version);
+            Assert.That(compatibility.Supported, Is.EqualTo(supported));
+            Assert.That(compatibility.Verified, Is.EqualTo(verified));
         }
 
         [Test]

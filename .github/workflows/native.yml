@@ -20,5 +20,5 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Verify Apple Silicon layer
         run: |
-          file build/layer/libmaquestlink_openxr_layer.so | grep -E 'Mach-O .* arm64'
-          codesign --verify --strict build/layer/libmaquestlink_openxr_layer.so
+          file build/layer/libmetalquestlink_openxr_layer.so | grep -E 'Mach-O .* arm64'
+          codesign --verify --strict build/layer/libmetalquestlink_openxr_layer.so
